@@ -4,7 +4,7 @@
  * Token is persisted in localStorage so it survives page refreshes.
  */
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://byd-sales-floor-backend.vercel.app/api';
 
 const TOKEN_KEY = 'byd_auth_token';
 
