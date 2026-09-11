@@ -46,7 +46,7 @@ export function MessageModal({
 
   const handleApplyTemplate = (templateText: string) => {
     const customerFirstName = recipient.split(' ')[0] || 'there';
-    const modelName = lead ? lead.model : 'SEALION 7';
+    const modelName = (lead ? (lead.model || lead.vehicle) : 'SEALION 7') || 'SEALION 7';
     const formatted = templateText
       .replace(/\[Name\]/g, customerFirstName)
       .replace(/\[Model\]/g, modelName)

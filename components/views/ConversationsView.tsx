@@ -27,9 +27,9 @@ export function ConversationsView({
 
   const filteredThreads = threads.filter(
     (t) =>
-      t.name.toLowerCase().includes(query.toLowerCase()) ||
-      t.model.toLowerCase().includes(query.toLowerCase()) ||
-      t.lastMessage.toLowerCase().includes(query.toLowerCase())
+      (t.name || t.prospectName || '').toLowerCase().includes(query.toLowerCase()) ||
+      (t.model || '').toLowerCase().includes(query.toLowerCase()) ||
+      (t.lastMessage || '').toLowerCase().includes(query.toLowerCase())
   );
 
   return (

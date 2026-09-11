@@ -76,7 +76,7 @@ export function DeliveriesView({
               Ready for Pickup · {featured.date}
             </span>
 
-            <h2>{featured.name.toUpperCase()} · {featured.vehicle.toUpperCase()}</h2>
+            <h2>{(featured.name || '').toUpperCase()} · {(featured.vehicle || '').toUpperCase()}</h2>
 
             <p>
               Melbourne CBD Delivery Bay 2 · Rego: {featured.rego} · VIN: {featured.vin} · Handover Specialist: {featured.agent}

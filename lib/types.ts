@@ -1,30 +1,40 @@
 export interface Lead {
-  id: number;
+  _id?: string;
+  id?: number | string; // legacy support
   name: string;
-  initials: string;
-  model: string;
-  score: number;
-  stage: 'Imported' | 'Engaged' | 'Qualified' | 'Committed';
-  source: string;
-  lastTouch: string;
-  action: string;
-  priority?: boolean;
-  consultant?: string;
+  initials?: string;
+  vehicle?: string;
+  model?: string; // fallback / alias
+  score?: number;
+  stage?: string;
+  status?: string;
+  source?: string;
+  lastTouch?: string;
+  action?: string;
+  priority?: string | boolean;
+  assignedTo?: string;
+  allocatedPersonFullName?: string;
+  consultant?: string; // legacy support
   phone?: string;
   email?: string;
   notes?: string;
 }
 
 export interface Delivery {
-  id: number;
+  _id?: string;
+  id?: number | string; // legacy support
   name: string;
-  vehicle: string;
-  date: string;
-  stage: 'Ready for Pickup' | 'PDI' | 'In Transit';
-  status: 'Contacted' | 'Not contacted';
-  rego: string;
-  vin: string;
-  agent: string;
+  vehicle?: string;
+  delivery_date?: string;
+  date?: string; // legacy support
+  stage?: string;
+  contact_status?: string;
+  status?: string; // legacy support
+  rego?: string;
+  vin?: string;
+  salesperson?: string;
+  agent?: string; // legacy support
+  phone?: string;
 }
 
 export interface TimelineEvent {
@@ -41,7 +51,7 @@ export interface TeamMember {
   avatar: string;
   load: number;
   events: {
-    start: number; // percentage or slot
+    start: number;
     width: number;
     title: string;
     type: 'drive' | 'delivery' | 'hold' | 'followup';
@@ -49,13 +59,17 @@ export interface TeamMember {
 }
 
 export interface ConversationThread {
-  id: number;
-  name: string;
-  initials: string;
+  _id?: string;
+  id: number | string;
+  prospectName?: string;
+  name?: string; // legacy
+  initials?: string;
   lastMessage: string;
-  time: string;
+  time?: string;
+  lastMessageAt?: string;
   unreadCount?: number;
-  model: string;
+  msgCount?: number;
+  model?: string;
   optOutSuppressed?: boolean;
 }
 

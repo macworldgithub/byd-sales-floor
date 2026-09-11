@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -19,23 +19,70 @@ import { AddProspectModal } from '@/components/modals/AddProspectModal';
 import { MessageModal } from '@/components/modals/MessageModal';
 import { AddEventModal } from '@/components/modals/AddEventModal';
 import { ToastContainer, ToastMessage } from '@/components/ui/Toast';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
+import { leadApi, deliveryApi, conversationApi, statsApi, appointmentApi } from '@/lib/api';
 import {
-  INITIAL_LEADS,
-  INITIAL_DELIVERIES,
   TODAY_TIMELINE_EVENTS,
   CONVERSATION_THREADS,
 } from '@/lib/data';
 import { Lead, Delivery, TimelineEvent, ConversationThread } from '@/lib/types';
 
 export default function SalesFloorApp() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+
   // Navigation & Role State
   const [activeTab, setActiveTab] = useState<string>('today');
   const [role, setRole] = useState<'consultant' | 'manager'>('consultant');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
 
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, authLoading, router]);
+
   // Data State
-  const [leads, setLeads] = useState<Lead[]>(INITIAL_LEADS);
-  const [deliveries, setDeliveries] = useState<Delivery[]>(INITIAL_DELIVERIES);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Initial fetch effect
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [leadsRes, deliveriesRes, threadsRes] = await Promise.all([
+          leadApi.getLeads({ limit: '20' }).catch(() => ({ success: false, data: [] })),
+          deliveryApi.getClients({ limit: '20' }).catch(() => ({ success: false, data: [] })),
+          conversationApi.getConversations().catch(() => ({ success: false, data: [] }))
+        ]);
+        
+        if (leadsRes.success && leadsRes.data) {
+          setLeads(leadsRes.data);
+        }
+        
+        if (deliveriesRes.success && deliveriesRes.data) {
+          setDeliveries(deliveriesRes.data);
+        }
+
+        if (threadsRes.success && threadsRes.data) {
+          setThreads(threadsRes.data);
+        }
+
+      } catch (err) {
+        console.error('Failed to load initial data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [isAuthenticated]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>(TODAY_TIMELINE_EVENTS);
   const [threads, setThreads] = useState<ConversationThread[]>(CONVERSATION_THREADS);
 
@@ -79,18 +126,20 @@ export default function SalesFloorApp() {
   };
 
   const handleOpenMessage = (lead?: Lead | ConversationThread) => {
-    if (lead && 'stage' in lead) {
+    if (lead && 'stage' in lead && (lead as Lead).stage) {
       setMessageLead(lead as Lead);
     } else if (lead) {
-      const found = leads.find((l) => l.name === lead.name);
+      const threadOrLeadName = ('name' in lead && lead.name) || ('prospectName' in lead && (lead as ConversationThread).prospectName) || '';
+      const found = leads.find((l) => l.name === threadOrLeadName);
       if (found) {
         setMessageLead(found);
       } else {
         setMessageLead({
           id: lead.id,
-          name: lead.name,
-          initials: lead.initials,
-          model: lead.model,
+          name: threadOrLeadName || 'Customer',
+          initials: lead.initials || 'CU',
+          model: lead.model || 'SEALION 7',
+          vehicle: lead.model || 'SEALION 7',
           score: 70,
           stage: 'Engaged',
           source: 'Chat',
@@ -174,20 +223,20 @@ export default function SalesFloorApp() {
     );
   };
 
-  const handleUpdateLeadStage = (leadId: number, newStage: Lead['stage']) => {
+  const handleUpdateLeadStage = (leadId: number | string, newStage?: Lead['stage']) => {
     setLeads((prev) =>
-      prev.map((l) => (l.id === leadId ? { ...l, stage: newStage } : l))
+      prev.map((l) => ((l._id === leadId || l.id === leadId) ? { ...l, stage: newStage || l.stage } : l))
     );
-    if (selectedLead && selectedLead.id === leadId) {
-      setSelectedLead((prev) => (prev ? { ...prev, stage: newStage } : null));
+    if (selectedLead && (selectedLead._id === leadId || selectedLead.id === leadId)) {
+      setSelectedLead((prev) => (prev ? { ...prev, stage: newStage || prev.stage } : null));
     }
-    addToast('info', 'Pipeline Stage Updated', `Lead status updated to ${newStage}.`);
+    addToast('info', 'Pipeline Stage Updated', `Lead status updated to ${newStage || 'new stage'}.`);
   };
 
-  const handleAssignLead = (leadId: number, consultantName: string) => {
+  const handleAssignLead = (leadId: number | string, consultantName: string) => {
     setLeads((prev) =>
       prev.map((l) =>
-        l.id === leadId
+        (l._id === leadId || l.id === leadId)
           ? {
               ...l,
               consultant: consultantName,
@@ -221,6 +270,14 @@ export default function SalesFloorApp() {
 
   const unassignedCount = leads.filter((l) => !l.consultant || l.stage === 'Imported').length;
   const unreadCount = threads.filter((t) => t.unreadCount).length;
+
+  if (authLoading || (!isAuthenticated && typeof window !== 'undefined')) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f4f5f7]">
+        <div className="w-8 h-8 rounded-full border-4 border-slate-300 border-t-blue-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-[#f4f5f7]">

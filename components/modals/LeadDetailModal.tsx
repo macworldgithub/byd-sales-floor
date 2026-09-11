@@ -21,7 +21,7 @@ interface LeadDetailModalProps {
   onClose: () => void;
   onOpenBookDrive: (lead: Lead) => void;
   onOpenMessage: (lead: Lead) => void;
-  onUpdateStage: (leadId: number, stage: Lead['stage']) => void;
+  onUpdateStage: (leadId: number | string, stage: Lead['stage']) => void;
 }
 
 export function LeadDetailModal({
@@ -78,7 +78,7 @@ export function LeadDetailModal({
                 return (
                   <button
                     key={st}
-                    onClick={() => onUpdateStage(lead.id, st)}
+                    onClick={() => onUpdateStage(lead._id || lead.id || '', st)}
                     className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition-all ${
                       isSelected
                         ? 'bg-slate-900 text-white border-slate-900 shadow-sm'

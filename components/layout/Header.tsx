@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Bell, Menu, Radio, Sparkles, User, ShieldCheck } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
+import { Bell, Menu, Radio, Sparkles, User, ShieldCheck, LogOut } from 'lucide-react';
 
 interface HeaderProps {
   role: 'consultant' | 'manager';
@@ -18,6 +18,8 @@ export function Header({
   onOpenNotifications,
   unreadNotifications = true,
 }: HeaderProps) {
+  const { user, logout } = useAuth();
+  
   return (
     <header className="topbar">
       {/* Left Greeting */}
@@ -33,7 +35,7 @@ export function Header({
         <div>
           <p className="topbar-kicker">BYD Melbourne CBD · Floor OS</p>
           <h2 className="text-base font-semibold text-slate-900 tracking-tight">
-            {role === 'consultant' ? 'Good morning, Alex' : 'Floor Manager Console'}
+            {user ? `Good morning, ${user.name.split(' ')[0]}` : 'Floor Manager Console'}
           </h2>
         </div>
       </div>
@@ -75,12 +77,20 @@ export function Header({
         </button>
 
         {/* Profile Pill */}
-        <div className="profile-button">
-          <span>{role === 'consultant' ? 'AM' : 'FM'}</span>
+        <div className="profile-button relative group cursor-default">
+          <span>{user?.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'AM'}</span>
           <div className="hidden lg:block text-left">
-            <strong>{role === 'consultant' ? 'Alex Morgan' : 'Marcus Vance'}</strong>
-            <small>{role === 'consultant' ? 'Senior EV Specialist' : 'Floor Director'}</small>
+            <strong>{user?.name || 'Alex Morgan'}</strong>
+            <small>{user?.role.replace('_', ' ') || 'Senior EV Specialist'}</small>
           </div>
+          
+          <button 
+            onClick={logout}
+            className="absolute -bottom-10 right-0 hidden group-hover:flex items-center gap-2 bg-white shadow-lg border border-slate-200 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-slate-50 transition-colors whitespace-nowrap"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
         </div>
       </div>
     </header>

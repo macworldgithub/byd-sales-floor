@@ -38,11 +38,11 @@ export function LeadsView({
     const matchesStage = selectedStage === 'All' || lead.stage === selectedStage;
     const matchesSearch =
       searchQuery === '' ||
-      lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lead.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lead.source.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lead.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lead.model || lead.vehicle || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lead.source || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (lead.phone && lead.phone.includes(searchQuery));
-    return matchesStage && matchesSearch;
+    return matchesStage && Boolean(matchesSearch);
   });
 
   const getStageColor = (stage: Lead['stage']) => {

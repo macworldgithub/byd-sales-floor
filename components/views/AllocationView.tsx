@@ -15,7 +15,7 @@ import { CONSULTANT_CAPACITIES } from '@/lib/data';
 
 interface AllocationViewProps {
   unassignedLeads: Lead[];
-  onAssignLead: (leadId: number, consultantName: string) => void;
+  onAssignLead: (leadId: number | string, consultantName: string) => void;
 }
 
 export function AllocationView({
@@ -97,14 +97,14 @@ export function AllocationView({
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       <button
-                        onClick={() => onAssignLead(lead.id, 'Lena Park')}
+                        onClick={() => onAssignLead(lead._id || lead.id || '', 'Lena Park')}
                         className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
                       >
                         <span>Lena Park (46%)</span>
                         <ArrowRight className="w-3 h-3 text-slate-400" />
                       </button>
                       <button
-                        onClick={() => onAssignLead(lead.id, 'Alex Morgan')}
+                        onClick={() => onAssignLead(lead._id || lead.id || '', 'Alex Morgan')}
                         className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
                       >
                         <span>Alex Morgan (72%)</span>
