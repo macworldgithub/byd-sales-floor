@@ -101,7 +101,7 @@ export function TodayView({
               className="hero-secondary px-5 py-2.5 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 transition-all"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Add prospect</span>
+              <span>Add prospect</span>
             </button>
           </div>
         </div>

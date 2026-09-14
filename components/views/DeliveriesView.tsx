@@ -166,40 +166,44 @@ export function DeliveriesView({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 min-w-0">
             {paginatedDeliveries.map((del) => (
               <div
                 key={del.id}
-                className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-shadow shadow-xs flex flex-col justify-between space-y-3"
+                className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-shadow shadow-xs flex flex-col justify-between space-y-3 min-w-0 overflow-hidden"
               >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className={`stage-pill ${getStageBadgeColor(del.stage)} text-[9px]`}>
+                <div className="min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+                    <span className={`stage-pill ${getStageBadgeColor(del.stage)} text-[9px] shrink-0`}>
                       {del.stage}
                     </span>
-                    <span className="text-xs font-semibold text-slate-500 font-mono">{del.date}</span>
+                    <span className="text-xs font-semibold text-slate-500 font-mono truncate">{del.date}</span>
                   </div>
 
-                  <h3 className="font-condensed text-lg font-semibold text-slate-900">{del.name}</h3>
-                  <p className="text-xs text-slate-600 font-medium">{del.vehicle}</p>
+                  <h3 className="font-condensed text-lg font-semibold text-slate-900 truncate" title={del.name}>
+                    {del.name}
+                  </h3>
+                  <p className="text-xs text-slate-600 font-medium truncate" title={del.vehicle}>
+                    {del.vehicle}
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                  <div className="detail-cell">
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 min-w-0">
+                  <div className="detail-cell min-w-0 overflow-hidden" title={del.rego}>
                     <span>Rego</span>
-                    <strong>{del.rego}</strong>
+                    <strong className="truncate font-mono">{del.rego || '—'}</strong>
                   </div>
-                  <div className="detail-cell">
+                  <div className="detail-cell min-w-0 overflow-hidden" title={del.vin}>
                     <span>VIN</span>
-                    <strong>{del.vin}</strong>
+                    <strong className="truncate font-mono">{del.vin || '—'}</strong>
                   </div>
-                  <div className="detail-cell">
+                  <div className="detail-cell min-w-0 overflow-hidden" title={del.status}>
                     <span>Status</span>
-                    <strong>{del.status}</strong>
+                    <strong className="truncate">{del.status || '—'}</strong>
                   </div>
-                  <div className="detail-cell">
+                  <div className="detail-cell min-w-0 overflow-hidden" title={del.agent}>
                     <span>Specialist</span>
-                    <strong>{del.agent}</strong>
+                    <strong className="truncate">{del.agent || '—'}</strong>
                   </div>
                 </div>
               </div>

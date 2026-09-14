@@ -109,7 +109,7 @@ export function CalendarView({
             className="signal-button px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Add event</span>
+            <span>Add event</span>
           </button>
         </div>
       </div>
@@ -283,10 +283,10 @@ export function CalendarView({
                         evt.type === 'drive'
                           ? 'bg-cyan-100 border border-cyan-300 text-cyan-900'
                           : evt.type === 'delivery'
-                          ? 'bg-red-100 border border-red-300 text-red-900'
-                          : evt.type === 'followup'
-                          ? 'bg-amber-100 border border-amber-300 text-amber-900'
-                          : 'bg-slate-100 border border-slate-300 text-slate-700';
+                            ? 'bg-red-100 border border-red-300 text-red-900'
+                            : evt.type === 'followup'
+                              ? 'bg-amber-100 border border-amber-300 text-amber-900'
+                              : 'bg-slate-100 border border-slate-300 text-slate-700';
 
                       return (
                         <div

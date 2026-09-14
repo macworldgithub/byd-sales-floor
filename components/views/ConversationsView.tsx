@@ -63,7 +63,7 @@ export function ConversationsView({
           className="signal-button px-4 py-2.5 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 shadow-md transition-all"
         >
           <Send className="w-4 h-4" />
-          <span>✈ Compose message</span>
+          <span>Compose message</span>
         </button>
       </div>
 

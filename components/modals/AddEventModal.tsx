@@ -44,7 +44,7 @@ export function AddEventModal({
         <div className="flex items-start justify-between border-b border-slate-100 pb-3">
           <div>
             <p className="eyebrow">Floor Calendar</p>
-            <h2 className="section-title text-xl">+ Add Floor Event</h2>
+            <h2 className="section-title text-xl"> Add Floor Event</h2>
           </div>
           <button
             onClick={onClose}

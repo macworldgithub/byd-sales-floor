@@ -91,7 +91,7 @@ export function LeadsView({
           className="signal-button px-4 py-2.5 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 transition-all shadow-md"
         >
           <Plus className="w-4 h-4" />
-          <span>+ Add prospect</span>
+          <span> Add prospect</span>
         </button>
       </div>
 

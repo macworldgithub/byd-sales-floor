@@ -53,7 +53,7 @@ export function AddProspectModal({
         <div className="flex items-start justify-between border-b border-slate-100 pb-3">
           <div>
             <p className="eyebrow">Prospect Intake</p>
-            <h2 className="section-title text-xl">+ Add New Prospect</h2>
+            <h2 className="section-title text-xl"> Add New Prospect</h2>
           </div>
           <button
             onClick={onClose}

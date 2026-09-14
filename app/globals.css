@@ -1406,6 +1406,8 @@
   border-radius: calc(var(--radius) + 4px);
   background-color: #f8fafc;
   padding: 0.75rem;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .detail-cell span {
@@ -1415,6 +1417,9 @@
   color: #94a3b8;
   text-transform: uppercase;
   display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .detail-cell strong {
@@ -1422,6 +1427,9 @@
   font-size: 0.75rem;
   color: #1e293b;
   display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .conversation-row {
