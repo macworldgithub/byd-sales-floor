@@ -22,7 +22,7 @@ interface DeliveriesViewProps {
   onOpenMessage: (lead: Lead) => void;
   onCompleteHandover?: (delivery: Delivery) => void;
 }
-
+//  "delivery: '/images/byd-delivery-bay.jpg'".
 export function DeliveriesView({
   deliveries,
   onOpenMessage,
