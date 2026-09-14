@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import {
   Car,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Delivery, Lead } from '@/lib/types';
 import { ASSET_PATHS } from '@/lib/data';
+import { Pagination } from '@/components/ui/Pagination';
 
 interface DeliveriesViewProps {
   deliveries: Delivery[];
@@ -27,7 +28,16 @@ export function DeliveriesView({
   onOpenMessage,
   onCompleteHandover,
 }: DeliveriesViewProps) {
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 6;
+
   const featured = deliveries[0];
+
+  const totalPages = Math.ceil(deliveries.length / pageSize);
+  const paginatedDeliveries = deliveries.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const getStageBadgeColor = (stage: Delivery['stage']) => {
     switch (stage) {
@@ -144,56 +154,68 @@ export function DeliveriesView({
       )}
 
       {/* Upcoming Deliveries List Surface */}
-      <div className="surface-card p-5 space-y-4">
-        <div className="card-header-row !p-0 !pb-4">
-          <div>
-            <p className="eyebrow">Upcoming Schedule</p>
-            <h2 className="section-title">Delivery pipeline & stage tracking</h2>
-          </div>
-          <span className="text-xs font-semibold text-slate-500 font-mono">
-            SYNCED TO DMS · LIVE
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {deliveries.map((del) => (
-            <div
-              key={del.id}
-              className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-shadow shadow-xs flex flex-col justify-between space-y-3"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className={`stage-pill ${getStageBadgeColor(del.stage)} text-[9px]`}>
-                    {del.stage}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-500 font-mono">{del.date}</span>
-                </div>
-
-                <h3 className="font-condensed text-lg font-semibold text-slate-900">{del.name}</h3>
-                <p className="text-xs text-slate-600 font-medium">{del.vehicle}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                <div className="detail-cell">
-                  <span>Rego</span>
-                  <strong>{del.rego}</strong>
-                </div>
-                <div className="detail-cell">
-                  <span>VIN</span>
-                  <strong>{del.vin}</strong>
-                </div>
-                <div className="detail-cell">
-                  <span>Status</span>
-                  <strong>{del.status}</strong>
-                </div>
-                <div className="detail-cell">
-                  <span>Specialist</span>
-                  <strong>{del.agent}</strong>
-                </div>
-              </div>
+      <div className="surface-card overflow-hidden">
+        <div className="p-5 space-y-4">
+          <div className="card-header-row !p-0 !pb-4">
+            <div>
+              <p className="eyebrow">Upcoming Schedule</p>
+              <h2 className="section-title">Delivery pipeline & stage tracking</h2>
             </div>
-          ))}
+            <span className="text-xs font-semibold text-slate-500 font-mono">
+              SYNCED TO DMS · LIVE
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedDeliveries.map((del) => (
+              <div
+                key={del.id}
+                className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-shadow shadow-xs flex flex-col justify-between space-y-3"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className={`stage-pill ${getStageBadgeColor(del.stage)} text-[9px]`}>
+                      {del.stage}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-500 font-mono">{del.date}</span>
+                  </div>
+
+                  <h3 className="font-condensed text-lg font-semibold text-slate-900">{del.name}</h3>
+                  <p className="text-xs text-slate-600 font-medium">{del.vehicle}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                  <div className="detail-cell">
+                    <span>Rego</span>
+                    <strong>{del.rego}</strong>
+                  </div>
+                  <div className="detail-cell">
+                    <span>VIN</span>
+                    <strong>{del.vin}</strong>
+                  </div>
+                  <div className="detail-cell">
+                    <span>Status</span>
+                    <strong>{del.status}</strong>
+                  </div>
+                  <div className="detail-cell">
+                    <span>Specialist</span>
+                    <strong>{del.agent}</strong>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
+
+        {/* Pagination Bar */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={deliveries.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemName="deliveries"
+        />
       </div>
     </div>
   );

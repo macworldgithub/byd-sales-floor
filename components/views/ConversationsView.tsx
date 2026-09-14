@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MessageSquare,
   Search,
@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { ConversationThread, Lead } from '@/lib/types';
+import { Pagination } from '@/components/ui/Pagination';
 
 interface ConversationsViewProps {
   threads: ConversationThread[];
@@ -24,12 +25,25 @@ export function ConversationsView({
   onOpenNewMessage,
 }: ConversationsViewProps) {
   const [query, setQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 5;
+
+  // Reset page when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query]);
 
   const filteredThreads = threads.filter(
     (t) =>
       (t.name || t.prospectName || '').toLowerCase().includes(query.toLowerCase()) ||
       (t.model || '').toLowerCase().includes(query.toLowerCase()) ||
       (t.lastMessage || '').toLowerCase().includes(query.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredThreads.length / pageSize);
+  const paginatedThreads = filteredThreads.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   return (
@@ -76,47 +90,63 @@ export function ConversationsView({
 
         {/* Conversation List */}
         <div className="divide-y divide-slate-100">
-          {filteredThreads.map((thread) => (
-            <button
-              key={thread.id}
-              onClick={() => onSelectThread(thread)}
-              className="conversation-row group"
-            >
-              <div className="relative">
-                <div className="avatar-initials">{thread.initials}</div>
-                {thread.unreadCount && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#e60012] rounded-full ring-2 ring-white" />
-                )}
-              </div>
+          {filteredThreads.length === 0 ? (
+            <div className="p-12 text-center text-slate-400 text-sm">
+              No matching conversation threads.
+            </div>
+          ) : (
+            paginatedThreads.map((thread) => (
+              <button
+                key={thread.id}
+                onClick={() => onSelectThread(thread)}
+                className="conversation-row group text-left w-full"
+              >
+                <div className="relative">
+                  <div className="avatar-initials">{thread.initials}</div>
+                  {thread.unreadCount && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#e60012] rounded-full ring-2 ring-white" />
+                  )}
+                </div>
 
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <strong className="text-xs md:text-sm font-semibold text-slate-900 group-hover:text-[#e60012] transition-colors">
-                      {thread.name}
-                    </strong>
-                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                      {thread.model}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <strong className="text-xs md:text-sm font-semibold text-slate-900 group-hover:text-[#e60012] transition-colors">
+                        {thread.name}
+                      </strong>
+                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                        {thread.model}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                      {thread.time}
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-mono shrink-0">
-                    {thread.time}
-                  </span>
+
+                  <p className="text-xs text-slate-600 mt-1 line-clamp-1">
+                    {thread.lastMessage}
+                  </p>
                 </div>
 
-                <p className="text-xs text-slate-600 mt-1 line-clamp-1">
-                  {thread.lastMessage}
-                </p>
-              </div>
-
-              {thread.unreadCount && (
-                <div className="unread-count">
-                  {thread.unreadCount}
-                </div>
-              )}
-            </button>
-          ))}
+                {thread.unreadCount && (
+                  <div className="unread-count">
+                    {thread.unreadCount}
+                  </div>
+                )}
+              </button>
+            ))
+          )}
         </div>
+
+        {/* Pagination Bar */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredThreads.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemName="conversations"
+        />
       </div>
     </div>
   );

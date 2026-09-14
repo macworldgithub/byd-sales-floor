@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   GitBranch,
   AlertTriangle,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Lead, ConsultantCapacity } from '@/lib/types';
 import { CONSULTANT_CAPACITIES } from '@/lib/data';
+import { Pagination } from '@/components/ui/Pagination';
 
 interface AllocationViewProps {
   unassignedLeads: Lead[];
@@ -22,6 +23,15 @@ export function AllocationView({
   unassignedLeads,
   onAssignLead,
 }: AllocationViewProps) {
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 4;
+
+  const totalPages = Math.ceil(unassignedLeads.length / pageSize);
+  const paginatedUnassigned = unassignedLeads.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
   return (
     <div className="view-stack">
       {/* Page Intro Banner */}
@@ -43,79 +53,91 @@ export function AllocationView({
       {/* Allocation Grid */}
       <div className="allocation-grid">
         {/* Left Column: Unassigned Inbound Queue */}
-        <div className="surface-card p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <p className="eyebrow">Pending Allocation</p>
-              <h3 className="section-title text-xl">Unassigned Queue</h3>
-            </div>
-            <div className="queue-count">{unassignedLeads.length}</div>
-          </div>
-
-          <div className="space-y-3">
-            {unassignedLeads.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs">
-                All incoming leads are currently allocated.
+        <div className="surface-card overflow-hidden flex flex-col justify-between">
+          <div className="p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <p className="eyebrow">Pending Allocation</p>
+                <h3 className="section-title text-xl">Unassigned Queue</h3>
               </div>
-            ) : (
-              unassignedLeads.map((lead) => (
-                <div
-                  key={lead.id}
-                  className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3 hover:border-slate-300 transition-all"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="avatar-initials bg-white">{lead.initials}</div>
-                      <div>
-                        <strong className="text-sm text-slate-900 block font-semibold">
-                          {lead.name}
-                        </strong>
-                        <span className="text-xs text-slate-500 block font-medium">
-                          {lead.model} · via {lead.source}
+              <div className="queue-count">{unassignedLeads.length}</div>
+            </div>
+
+            <div className="space-y-3">
+              {unassignedLeads.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  All incoming leads are currently allocated.
+                </div>
+              ) : (
+                paginatedUnassigned.map((lead) => (
+                  <div
+                    key={lead.id}
+                    className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3 hover:border-slate-300 transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="avatar-initials bg-white">{lead.initials}</div>
+                        <div>
+                          <strong className="text-sm text-slate-900 block font-semibold">
+                            {lead.name}
+                          </strong>
+                          <span className="text-xs text-slate-500 block font-medium">
+                            {lead.model} · via {lead.source}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right font-condensed">
+                        <span className="text-lg font-bold text-[#e60012] block">
+                          {lead.score} PTS
                         </span>
+                        <small className="text-[10px] text-slate-400 uppercase font-mono">
+                          Intent
+                        </small>
                       </div>
                     </div>
-                    <div className="text-right font-condensed">
-                      <span className="text-lg font-bold text-[#e60012] block">
-                        {lead.score} PTS
-                      </span>
-                      <small className="text-[10px] text-slate-400 uppercase font-mono">
-                        Intent
-                      </small>
+
+                    <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] flex items-center gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>Allocated 1 hr 54m ago · SLA warning</span>
+                    </div>
+
+                    {/* Quick Assign Buttons */}
+                    <div className="space-y-1 pt-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase font-mono">
+                        Assign to available consultant:
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => onAssignLead(lead._id || lead.id || '', 'Lena Park')}
+                          className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
+                        >
+                          <span>Lena Park (46%)</span>
+                          <ArrowRight className="w-3 h-3 text-slate-400" />
+                        </button>
+                        <button
+                          onClick={() => onAssignLead(lead._id || lead.id || '', 'Alex Morgan')}
+                          className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
+                        >
+                          <span>Alex Morgan (72%)</span>
+                          <ArrowRight className="w-3 h-3 text-slate-400" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] flex items-center gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span>Allocated 1 hr 54m ago · SLA warning</span>
-                  </div>
-
-                  {/* Quick Assign Buttons */}
-                  <div className="space-y-1 pt-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase font-mono">
-                      Assign to available consultant:
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => onAssignLead(lead._id || lead.id || '', 'Lena Park')}
-                        className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
-                      >
-                        <span>Lena Park (46%)</span>
-                        <ArrowRight className="w-3 h-3 text-slate-400" />
-                      </button>
-                      <button
-                        onClick={() => onAssignLead(lead._id || lead.id || '', 'Alex Morgan')}
-                        className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
-                      >
-                        <span>Alex Morgan (72%)</span>
-                        <ArrowRight className="w-3 h-3 text-slate-400" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
+
+          {/* Pagination Bar */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={unassignedLeads.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            itemName="unassigned leads"
+          />
         </div>
 
         {/* Right Column: Consultant Capacities */}

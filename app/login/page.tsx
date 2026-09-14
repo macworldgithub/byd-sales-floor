@@ -9,11 +9,11 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [email, setEmail]         = useState('');
-  const [password, setPassword]   = useState('');
-  const [showPw, setShowPw]       = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError]         = useState('');
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,7 +154,7 @@ export default function LoginPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: #0a0d14;
+          background: #090c12;
           position: relative;
           overflow: hidden;
           font-family: 'Manrope', system-ui, sans-serif;
@@ -166,28 +166,28 @@ export default function LoginPage() {
         .login-bg__orb {
           position: absolute;
           border-radius: 50%;
-          filter: blur(80px);
-          opacity: 0.25;
+          filter: blur(90px);
+          opacity: 0.28;
           animation: orbFloat 12s ease-in-out infinite;
         }
         .login-bg__orb--1 {
           width: 500px; height: 500px;
-          background: radial-gradient(circle, #3b82f6 0%, #1d4ed8 60%, transparent 100%);
+          background: radial-gradient(circle, #e60012 0%, #80000a 60%, transparent 100%);
           top: -150px; right: -150px;
           animation-delay: 0s;
         }
         .login-bg__orb--2 {
           width: 400px; height: 400px;
-          background: radial-gradient(circle, #8b5cf6 0%, #6d28d9 60%, transparent 100%);
+          background: radial-gradient(circle, #171b22 0%, #000000 80%, transparent 100%);
           bottom: -100px; left: -100px;
           animation-delay: -4s;
         }
         .login-bg__orb--3 {
           width: 300px; height: 300px;
-          background: radial-gradient(circle, #06b6d4 0%, #0284c7 60%, transparent 100%);
+          background: radial-gradient(circle, #ff1a2a 0%, #b3000e 60%, transparent 100%);
           top: 40%; left: 30%;
           animation-delay: -8s;
-          opacity: 0.12;
+          opacity: 0.15;
         }
         @keyframes orbFloat {
           0%, 100% { transform: translate(0, 0) scale(1); }
@@ -199,15 +199,15 @@ export default function LoginPage() {
         .login-card {
           position: relative; z-index: 1;
           width: 100%; max-width: 420px;
-          background: rgba(15, 20, 32, 0.85);
-          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(23, 27, 34, 0.92);
+          border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 20px;
           padding: 2.5rem 2rem;
           backdrop-filter: blur(24px);
           box-shadow:
-            0 0 0 1px rgba(59,130,246,0.1),
-            0 32px 80px rgba(0,0,0,0.6),
-            0 0 120px rgba(59,130,246,0.04) inset;
+            0 0 0 1px rgba(230, 0, 18, 0.2),
+            0 32px 80px rgba(0,0,0,0.7),
+            0 0 100px rgba(230, 0, 18, 0.06) inset;
           animation: cardIn 0.5s cubic-bezier(0.22,1,0.36,1);
         }
         @keyframes cardIn {
@@ -222,11 +222,12 @@ export default function LoginPage() {
         }
         .login-logo {
           width: 52px; height: 52px;
-          background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+          background: linear-gradient(135deg, #e60012, #99000c);
           border-radius: 12px;
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0;
-          box-shadow: 0 4px 24px rgba(59,130,246,0.4);
+          box-shadow: 0 4px 24px rgba(230, 0, 18, 0.45);
+          border: 1px solid rgba(255, 255, 255, 0.15);
         }
         .login-brand__text { flex: 1; }
         .login-brand__title {
@@ -235,7 +236,7 @@ export default function LoginPage() {
           margin: 0 0 2px;
         }
         .login-brand__sub {
-          font-size: 0.72rem; color: #64748b;
+          font-size: 0.72rem; color: #94a3b8;
           letter-spacing: 0.04em; text-transform: uppercase;
           margin: 0;
         }
@@ -243,7 +244,7 @@ export default function LoginPage() {
         /* ── Divider ── */
         .login-divider {
           height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+          background: linear-gradient(90deg, transparent, rgba(230, 0, 18, 0.3), transparent);
           margin-bottom: 1.75rem;
         }
 
@@ -284,13 +285,13 @@ export default function LoginPage() {
         }
         .login-field__icon {
           position: absolute; left: 0.9rem;
-          width: 15px; height: 15px; color: #475569;
-          pointer-events: none; flex-shrink: 0;
+          width: 15px; height: 15px; color: #64748b;
+          pointer-events: none; flex-shrink: 0; z-index: 5;
         }
         .login-field__input {
           width: 100%;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(0, 0, 0, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 10px;
           padding: 0.75rem 0.9rem 0.75rem 2.5rem;
           color: #f1f5f9;
@@ -300,18 +301,18 @@ export default function LoginPage() {
           outline: none;
         }
         .login-field__input--pw { padding-right: 2.8rem; }
-        .login-field__input::placeholder { color: #334155; }
+        .login-field__input::placeholder { color: #475569; }
         .login-field__input:focus {
-          border-color: rgba(59,130,246,0.6);
-          background: rgba(255,255,255,0.06);
-          box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+          border-color: #e60012;
+          background: rgba(0, 0, 0, 0.4);
+          box-shadow: 0 0 0 3px rgba(230, 0, 18, 0.2);
         }
         .login-field__input:disabled { opacity: 0.5; cursor: not-allowed; }
         .login-field__toggle {
           position: absolute; right: 0.9rem;
           background: none; border: none; cursor: pointer;
-          color: #475569; display: flex; padding: 0;
-          transition: color 0.15s;
+          color: #64748b; display: flex; padding: 0;
+          transition: color 0.15s; z-index: 10;
         }
         .login-field__toggle:hover { color: #94a3b8; }
 
@@ -319,19 +320,19 @@ export default function LoginPage() {
         .login-submit {
           display: flex; align-items: center; justify-content: center; gap: 0.5rem;
           width: 100%; padding: 0.85rem 1.5rem;
-          background: linear-gradient(135deg, #1d4ed8, #3b82f6);
-          border: none; border-radius: 10px;
+          background: linear-gradient(135deg, #e60012, #b3000e);
+          border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px;
           color: #fff; font-size: 0.9rem; font-weight: 700;
           font-family: inherit; cursor: pointer;
           transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
-          box-shadow: 0 4px 20px rgba(59,130,246,0.35);
+          box-shadow: 0 4px 20px rgba(230, 0, 18, 0.4);
           margin-top: 0.25rem;
           letter-spacing: 0.01em;
         }
         .login-submit:hover:not(:disabled) {
-          opacity: 0.92;
+          background: linear-gradient(135deg, #ff1a2a, #cc0010);
           transform: translateY(-1px);
-          box-shadow: 0 6px 28px rgba(59,130,246,0.45);
+          box-shadow: 0 6px 28px rgba(230, 0, 18, 0.55);
         }
         .login-submit:active:not(:disabled) { transform: translateY(0); }
         .login-submit:disabled {
@@ -342,12 +343,12 @@ export default function LoginPage() {
         /* ── Footer ── */
         .login-footer {
           margin-top: 1.75rem; text-align: center;
-          font-size: 0.72rem; color: #334155;
+          font-size: 0.72rem; color: #475569;
           display: flex; align-items: center; justify-content: center; gap: 0.4rem;
         }
         .login-footer__dot {
           width: 3px; height: 3px; border-radius: 50%;
-          background: #334155; display: inline-block;
+          background: #475569; display: inline-block;
         }
       `}</style>
     </div>

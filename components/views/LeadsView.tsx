@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   Plus,
@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { Lead } from '@/lib/types';
+import { Pagination } from '@/components/ui/Pagination';
 
 interface LeadsViewProps {
   leads: Lead[];
@@ -31,8 +32,15 @@ export function LeadsView({
 }: LeadsViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<string>('All');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 8;
 
   const stageOptions = ['All', 'Imported', 'Engaged', 'Qualified', 'Committed'];
+
+  // Reset to page 1 on filter/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedStage]);
 
   const filteredLeads = leads.filter((lead) => {
     const matchesStage = selectedStage === 'All' || lead.stage === selectedStage;
@@ -44,6 +52,12 @@ export function LeadsView({
       (lead.phone && lead.phone.includes(searchQuery));
     return matchesStage && Boolean(matchesSearch);
   });
+
+  const totalPages = Math.ceil(filteredLeads.length / pageSize);
+  const paginatedLeads = filteredLeads.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const getStageColor = (stage: Lead['stage']) => {
     switch (stage) {
@@ -125,7 +139,7 @@ export function LeadsView({
               No matching prospects found.
             </div>
           ) : (
-            filteredLeads.map((lead) => (
+            paginatedLeads.map((lead) => (
               <div
                 key={lead.id}
                 className="lead-row group"
@@ -190,6 +204,16 @@ export function LeadsView({
             ))
           )}
         </div>
+
+        {/* Pagination Bar */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredLeads.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemName="prospects"
+        />
       </div>
     </div>
   );

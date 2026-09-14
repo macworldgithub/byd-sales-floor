@@ -19,7 +19,7 @@ export function Header({
   unreadNotifications = true,
 }: HeaderProps) {
   const { user, logout } = useAuth();
-  
+
   return (
     <header className="topbar">
       {/* Left Greeting */}
@@ -35,7 +35,7 @@ export function Header({
         <div>
           <p className="topbar-kicker">BYD Melbourne CBD · Floor OS</p>
           <h2 className="text-base font-semibold text-slate-900 tracking-tight">
-            {user ? `Good morning, ${user.name.split(' ')[0]}` : 'Floor Manager Console'}
+            {user ? `Good morning, ${user.name.split(' ')[0]}` : 'Manager Console'}
           </h2>
         </div>
       </div>
@@ -62,7 +62,7 @@ export function Header({
             onClick={() => setRole('manager')}
             className={role === 'manager' ? 'active' : ''}
           >
-            Floor Manager
+            Manager
           </button>
         </div>
 
@@ -83,8 +83,8 @@ export function Header({
             <strong>{user?.name || 'Alex Morgan'}</strong>
             <small>{user?.role.replace('_', ' ') || 'Senior EV Specialist'}</small>
           </div>
-          
-          <button 
+
+          <button
             onClick={logout}
             className="absolute -bottom-10 right-0 hidden group-hover:flex items-center gap-2 bg-white shadow-lg border border-slate-200 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-slate-50 transition-colors whitespace-nowrap"
           >
