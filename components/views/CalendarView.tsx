@@ -249,61 +249,63 @@ export function CalendarView({
 
         {/* View Mode: Team */}
         {viewMode === 'team' && (
-          <div className="team-calendar">
-            {/* Team Header */}
-            <div className="team-head">
-              <span>Consultant</span>
-              <span>09:00</span>
-              <span>10:00</span>
-              <span>11:00</span>
-              <span>12:00</span>
-              <span>13:00</span>
-              <span>14:00</span>
-              <span>15:00</span>
-              <span>16:00</span>
-            </div>
+          <div className="overflow-x-auto w-full -mx-px">
+            <div className="team-calendar min-w-[700px]">
+              {/* Team Header */}
+              <div className="team-head">
+                <span>Consultant</span>
+                <span>09:00</span>
+                <span>10:00</span>
+                <span>11:00</span>
+                <span>12:00</span>
+                <span>13:00</span>
+                <span>14:00</span>
+                <span>15:00</span>
+                <span>16:00</span>
+              </div>
 
-            {/* Team Rows */}
-            <div className="divide-y divide-slate-100">
-              {TEAM_MEMBERS.map((member, idx) => (
-                <div key={idx} className="team-row">
-                  <div className="team-person">
-                    <div className="avatar-mini">{member.avatar}</div>
-                    <div className="min-w-0">
-                      <strong className="text-xs text-slate-900 block truncate">{member.name}</strong>
-                      <span className="text-[10px] text-slate-400 block truncate">
-                        {member.role} · {member.load}% load
-                      </span>
+              {/* Team Rows */}
+              <div className="divide-y divide-slate-100">
+                {TEAM_MEMBERS.map((member, idx) => (
+                  <div key={idx} className="team-row">
+                    <div className="team-person">
+                      <div className="avatar-mini">{member.avatar}</div>
+                      <div className="min-w-0">
+                        <strong className="text-xs text-slate-900 block truncate">{member.name}</strong>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          {member.role} · {member.load}% load
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="team-track-grid">
+                      {member.events.map((evt, eIdx) => {
+                        const toneClass =
+                          evt.type === 'drive'
+                            ? 'bg-cyan-100 border border-cyan-300 text-cyan-900'
+                            : evt.type === 'delivery'
+                              ? 'bg-red-100 border border-red-300 text-red-900'
+                              : evt.type === 'followup'
+                                ? 'bg-amber-100 border border-amber-300 text-amber-900'
+                                : 'bg-slate-100 border border-slate-300 text-slate-700';
+
+                        return (
+                          <div
+                            key={eIdx}
+                            className={`team-event ${toneClass}`}
+                            style={{
+                              left: `${evt.start}%`,
+                              width: `${evt.width}%`,
+                            }}
+                          >
+                            <span className="truncate">{evt.title}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-
-                  <div className="team-track-grid">
-                    {member.events.map((evt, eIdx) => {
-                      const toneClass =
-                        evt.type === 'drive'
-                          ? 'bg-cyan-100 border border-cyan-300 text-cyan-900'
-                          : evt.type === 'delivery'
-                            ? 'bg-red-100 border border-red-300 text-red-900'
-                            : evt.type === 'followup'
-                              ? 'bg-amber-100 border border-amber-300 text-amber-900'
-                              : 'bg-slate-100 border border-slate-300 text-slate-700';
-
-                      return (
-                        <div
-                          key={eIdx}
-                          className={`team-event ${toneClass}`}
-                          style={{
-                            left: `${evt.start}%`,
-                            width: `${evt.width}%`,
-                          }}
-                        >
-                          <span className="truncate">{evt.title}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}

@@ -9,9 +9,10 @@ import {
   FileText,
   CheckCircle2,
   Lock,
+  ChevronDown,
 } from 'lucide-react';
 import { Lead } from '@/lib/types';
-import { QUICK_TEMPLATES } from '@/lib/data';
+import { DEFAULT_TEMPLATE_PACKS, interpolateTemplate } from '@/lib/templateEngine';
 
 interface MessageModalProps {
   isOpen: boolean;
@@ -26,32 +27,44 @@ export function MessageModal({
   lead,
   onSendMessage,
 }: MessageModalProps) {
-  const [recipient, setRecipient] = useState(lead ? lead.name : 'Sarah Mitchell');
+  const [recipient, setRecipient] = useState(lead ? lead.name : 'Customer');
   const [phone, setPhone] = useState(lead?.phone || '+61 412 890 234');
-  const [messageText, setMessageText] = useState(
-    `Hi ${lead ? lead.name.split(' ')[0] : 'Sarah'}, thank you for enquiring with BYD Melbourne CBD. Looking forward to our appointment.`
-  );
+  const [selectedTemplateName, setSelectedTemplateName] = useState('New allocation — first touch');
+  const [messageText, setMessageText] = useState('');
 
   useEffect(() => {
     if (lead) {
       setRecipient(lead.name);
       setPhone(lead.phone || '+61 412 890 234');
-      setMessageText(
-        `Hi ${lead.name.split(' ')[0]}, thank you for enquiring about the BYD ${lead.model} with BYD Melbourne CBD. I would love to answer any questions or arrange a private demonstration drive. — Alex Morgan`
-      );
+      const initialTmpl = DEFAULT_TEMPLATE_PACKS[0];
+      const interpolated = interpolateTemplate(initialTmpl.body, {
+        name: lead.name,
+        first_name: lead.name.split(' ')[0],
+        model: lead.model || lead.vehicle || 'SEALION 7',
+        consultant: lead.consultant || 'Alex Morgan',
+        consultant_mobile: '+61 412 890 234',
+        site: 'Melbourne CBD',
+      });
+      setMessageText(interpolated);
     }
   }, [lead]);
 
   if (!isOpen) return null;
 
-  const handleApplyTemplate = (templateText: string) => {
-    const customerFirstName = recipient.split(' ')[0] || 'there';
-    const modelName = (lead ? (lead.model || lead.vehicle) : 'SEALION 7') || 'SEALION 7';
-    const formatted = templateText
-      .replace(/\[Name\]/g, customerFirstName)
-      .replace(/\[Model\]/g, modelName)
-      .replace(/\[Time\]/g, '09:00 AM');
-    setMessageText(formatted);
+  const handleSelectTemplate = (templateName: string) => {
+    setSelectedTemplateName(templateName);
+    const tmpl = DEFAULT_TEMPLATE_PACKS.find((t) => t.name === templateName);
+    if (tmpl) {
+      const interpolated = interpolateTemplate(tmpl.body, {
+        name: recipient,
+        first_name: recipient.split(' ')[0],
+        model: (lead ? (lead.model || lead.vehicle) : 'SEALION 7') || 'SEALION 7',
+        consultant: lead?.consultant || 'Alex Morgan',
+        consultant_mobile: '+61 412 890 234',
+        site: 'Melbourne CBD',
+      });
+      setMessageText(interpolated);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -60,16 +73,18 @@ export function MessageModal({
     onClose();
   };
 
+  const segmentCount = Math.ceil((messageText.length || 1) / 160);
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className="modal-container p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200"
+        className="modal-container !max-w-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b border-slate-100 pb-3">
           <div>
-            <p className="eyebrow">Direct Outreach</p>
-            <h2 className="section-title text-xl">Compliant Customer Messaging</h2>
+            <p className="eyebrow">Compliant Outreach · MobileMessage Gateway</p>
+            <h2 className="section-title text-xl">Customer SMS & Email Dispatch</h2>
           </div>
           <button
             onClick={onClose}
@@ -83,34 +98,37 @@ export function MessageModal({
         <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
           <div>
             <span className="text-slate-400 block text-[10px] uppercase font-mono font-bold">
-              Sending to
+              Recipient
             </span>
             <strong className="text-slate-900 font-semibold">{recipient}</strong>
             <span className="text-slate-500 ml-2 font-mono">({phone})</span>
           </div>
           <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Spam Act Opt-Out Compliant</span>
+            <span>ACMA Sender ID Active</span>
           </div>
         </div>
 
-        {/* Quick Templates */}
+        {/* 10 Standard Template Packs Selector */}
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase font-mono block">
-            Pre-Approved Templates
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {QUICK_TEMPLATES.map((tmpl, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleApplyTemplate(tmpl.text)}
-                className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-left text-[11px] font-semibold text-slate-700 transition-colors shadow-xs line-clamp-1"
-              >
-                {tmpl.label}
-              </button>
-            ))}
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold text-slate-400 uppercase font-mono block">
+              Shipped Template Packs (§5.7 Compliant)
+            </label>
+            <span className="text-[10px] text-slate-400 font-mono">10 Packs Available</span>
           </div>
+
+          <select
+            value={selectedTemplateName}
+            onChange={(e) => handleSelectTemplate(e.target.value)}
+            className="w-full p-2.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
+          >
+            {DEFAULT_TEMPLATE_PACKS.map((tmpl) => (
+              <option key={tmpl.name} value={tmpl.name}>
+                {tmpl.name} ({tmpl.channel.toUpperCase()}) — {tmpl.trigger}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Message Box */}
@@ -118,10 +136,10 @@ export function MessageModal({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-[11px] font-bold text-slate-500 uppercase font-mono">
-                SMS Content
+                Interpolated SMS Body (Auto-Merged)
               </label>
               <span className="text-[10px] text-slate-400 font-mono">
-                {messageText.length} / 160 (1 SMS segment)
+                {messageText.length} chars · {segmentCount} SMS {segmentCount > 1 ? 'segments' : 'segment'}
               </span>
             </div>
             <textarea
@@ -129,14 +147,14 @@ export function MessageModal({
               rows={4}
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
-              className="w-full p-3 rounded-lg border border-slate-200 text-xs sm:text-sm text-slate-900 bg-slate-50 focus:bg-white focus:border-slate-400 outline-none transition-colors"
+              className="w-full p-3 rounded-lg border border-slate-200 text-xs sm:text-sm text-slate-900 bg-slate-50 focus:bg-white focus:border-slate-400 outline-none transition-colors leading-relaxed"
             />
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-            <div className="text-[11px] text-slate-400 flex items-center gap-1">
-              <Lock className="w-3 h-3 text-slate-400" />
-              <span>TLS encrypted direct gateway</span>
+            <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+              <Lock className="w-3 h-3 text-emerald-600" />
+              <span>TLS Direct Gateway · Opt-out suppression checked</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -152,7 +170,7 @@ export function MessageModal({
                 className="signal-button px-5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-md"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>Send via Telstra / Twilio</span>
+                <span>Send via MobileMessage</span>
               </button>
             </div>
           </div>

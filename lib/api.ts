@@ -4,6 +4,15 @@
  * Token is persisted in localStorage so it survives page refreshes.
  */
 
+import {
+  Lead,
+  Delivery,
+  Appointment,
+  ConversationThread,
+  DuplicateCheckResult,
+} from './types';
+import { TemplatePack } from './templateEngine';
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://byd-sales-floor-backend.vercel.app/api';
 
 const TOKEN_KEY = 'byd_auth_token';
@@ -90,11 +99,16 @@ export const authApi = {
 export const leadApi = {
   getLeads: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-    return fetchApi<any[]>(`/leads${qs}`);
+    return fetchApi<Lead[]>(`/leads${qs}`);
   },
-  createLead: (data: any) => fetchApi('/leads', { method: 'POST', body: JSON.stringify(data) }),
-  updateLead: (id: string, data: any) => fetchApi(`/leads/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  getTimeline: (id: string) => fetchApi(`/leads/${id}/timeline`),
+  getLead: (id: string) => fetchApi<Lead>(`/leads/${id}`),
+  createLead: (data: Partial<Lead>) =>
+    fetchApi<Lead>('/leads', { method: 'POST', body: JSON.stringify(data) }),
+  updateLead: (id: string, data: Partial<Lead>) =>
+    fetchApi<Lead>(`/leads/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getTimeline: (id: string) => fetchApi<any>(`/leads/${id}/timeline`),
+  addNote: (id: string, note: string) =>
+    fetchApi<Lead>(`/leads/${id}/notes`, { method: 'POST', body: JSON.stringify({ note }) }),
 };
 
 // ─── Delivery Centre Methods ───────────────────────────────────────────────────
@@ -102,26 +116,75 @@ export const leadApi = {
 export const deliveryApi = {
   getClients: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-    return fetchApi<any[]>(`/clients${qs}`);
+    return fetchApi<Delivery[]>(`/clients${qs}`);
   },
-  updateClient: (id: string, data: any) => fetchApi(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getClient: (id: string) => fetchApi<Delivery>(`/clients/${id}`),
+  updateClient: (id: string, data: Partial<Delivery>) =>
+    fetchApi<Delivery>(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   addComment: (id: string, text: string) =>
     fetchApi(`/clients/${id}/comments`, { method: 'POST', body: JSON.stringify({ body: text }) }),
 };
 
-// ─── Shared Methods ────────────────────────────────────────────────────────────
+// ─── Appointments / Calendar Methods ──────────────────────────────────────────
 
-export const statsApi = {
-  getSummary: () => fetchApi<any>('/stats/summary'),
+export const appointmentApi = {
+  getAppointments: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return fetchApi<Appointment[]>(`/appointments${qs}`);
+  },
+  createAppointment: (data: Partial<Appointment>) =>
+    fetchApi<Appointment>('/appointments', { method: 'POST', body: JSON.stringify(data) }),
+  updateAppointment: (id: string, data: Partial<Appointment>) =>
+    fetchApi<Appointment>(`/appointments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
+// ─── Conversations & Messaging Methods ─────────────────────────────────────────
+
 export const conversationApi = {
-  getConversations: () => fetchApi<any[]>('/conversations'),
+  getConversations: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return fetchApi<ConversationThread[]>(`/conversations${qs}`);
+  },
+  getConversation: (id: string) => fetchApi<ConversationThread>(`/conversations/${id}`),
   sendMessage: (id: string, text: string) =>
     fetchApi(`/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify({ text }) }),
 };
 
-export const appointmentApi = {
-  getAppointments: () => fetchApi<any[]>('/appointments'),
-  createAppointment: (data: any) => fetchApi('/appointments', { method: 'POST', body: JSON.stringify(data) }),
+export const messageApi = {
+  sendMessage: (data: {
+    phone: string;
+    body: string;
+    client_id?: string;
+    client_name?: string;
+    template_id?: string;
+  }) => fetchApi('/messages/send', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// ─── Templates Methods ────────────────────────────────────────────────────────
+
+export const templateApi = {
+  getTemplates: () => fetchApi<TemplatePack[]>('/templates'),
+  createTemplate: (data: Partial<TemplatePack>) =>
+    fetchApi<TemplatePack>('/templates', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// ─── Search & Duplicate Check Methods ──────────────────────────────────────────
+
+export const searchApi = {
+  search: (q: string) =>
+    fetchApi<{ leads: Lead[]; clients: Delivery[]; appointments: Appointment[] }>(
+      `/search?q=${encodeURIComponent(q)}`
+    ),
+  checkDuplicate: (phone?: string, email?: string) => {
+    const params = new URLSearchParams();
+    if (phone) params.set('phone', phone);
+    if (email) params.set('email', email);
+    return fetchApi<DuplicateCheckResult>(`/search/check-duplicate?${params.toString()}`);
+  },
+};
+
+// ─── Stats / Summary Methods ───────────────────────────────────────────────────
+
+export const statsApi = {
+  getSummary: () => fetchApi<any>('/stats/summary'),
 };

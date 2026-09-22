@@ -85,24 +85,26 @@ export function PerformanceView() {
         </div>
 
         {/* Bar Chart Container */}
-        <div className="report-chart">
-          {PERFORMANCE_CHART_DATA.map((val, idx) => (
-            <div key={idx} className="bar-column">
-              <span className="bar-value font-mono font-bold">{val}%</span>
-              <div className="bar-track">
-                <div
-                  className="bar-fill"
-                  style={{ height: `${val}%` }}
-                />
+        <div className="overflow-x-auto pb-2 -mx-2 px-2">
+          <div className="report-chart min-w-[320px]">
+            {PERFORMANCE_CHART_DATA.map((val, idx) => (
+              <div key={idx} className="bar-column">
+                <span className="bar-value font-mono font-bold">{val}%</span>
+                <div className="bar-track">
+                  <div
+                    className="bar-fill"
+                    style={{ height: `${val}%` }}
+                  />
+                </div>
+                <span className="text-xs font-bold text-slate-600">
+                  {PERFORMANCE_CHART_LABELS[idx]}
+                </span>
               </div>
-              <span className="text-xs font-bold text-slate-600">
-                {PERFORMANCE_CHART_LABELS[idx]}
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-slate-500 pt-2 font-mono">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-slate-500 pt-2 font-mono">
           <span>* SLA benchmark: 100% enquiries responded within 15 minutes</span>
           <span className="text-emerald-600 font-bold">Week-to-date average: 66.5%</span>
         </div>

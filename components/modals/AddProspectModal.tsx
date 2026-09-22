@@ -1,19 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, UserPlus, Sparkles, CheckCircle2 } from 'lucide-react';
+import { X, UserPlus, Sparkles, AlertTriangle, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { Lead } from '@/lib/types';
+import { searchApi } from '@/lib/api';
 
 interface AddProspectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddLead: (lead: Omit<Lead, 'id' | 'initials'>) => void;
+  onOpenExisting?: (lead: any) => void;
 }
 
 export function AddProspectModal({
   isOpen,
   onClose,
   onAddLead,
+  onOpenExisting,
 }: AddProspectModalProps) {
   const [name, setName] = useState('');
   const [model, setModel] = useState('SEALION 7 Premium');
@@ -24,7 +27,38 @@ export function AddProspectModal({
   const [score, setScore] = useState(75);
   const [notes, setNotes] = useState('');
 
+  // Duplicate Check State
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    found: boolean;
+    matchType?: string;
+    record?: any;
+    message?: string;
+  }>({ found: false });
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
+
   if (!isOpen) return null;
+
+  const handleCheckDuplicate = async () => {
+    if (!phone && !email) return;
+    setIsCheckingDuplicate(true);
+    try {
+      const res = await searchApi.checkDuplicate(phone, email);
+      if (res.success && res.data && res.data.duplicate) {
+        setDuplicateWarning({
+          found: true,
+          matchType: res.data.matchType,
+          record: res.data.matchRecord,
+          message: res.data.message || res.message,
+        });
+      } else {
+        setDuplicateWarning({ found: false });
+      }
+    } catch (err) {
+      // Ignore network errors in duplicate check
+    } finally {
+      setIsCheckingDuplicate(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,8 +86,8 @@ export function AddProspectModal({
       >
         <div className="flex items-start justify-between border-b border-slate-100 pb-3">
           <div>
-            <p className="eyebrow">Prospect Intake</p>
-            <h2 className="section-title text-xl"> Add New Prospect</h2>
+            <p className="eyebrow">Prospect Intake · Floor Capture</p>
+            <h2 className="section-title text-xl">Add New Prospect</h2>
           </div>
           <button
             onClick={onClose}
@@ -62,6 +96,42 @@ export function AddProspectModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Duplicate Guard Banner */}
+        {duplicateWarning.found && (
+          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2 animate-in fade-in">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="text-xs">
+                <strong className="font-semibold block">Possible Duplicate Detected</strong>
+                <p className="text-amber-700 mt-0.5">{duplicateWarning.message}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1 border-t border-amber-200/60 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (onOpenExisting && duplicateWarning.record) {
+                    onOpenExisting(duplicateWarning.record);
+                  }
+                }}
+                className="px-3 py-1 rounded bg-amber-200/80 hover:bg-amber-300 font-semibold text-amber-900 flex items-center gap-1 transition-colors"
+              >
+                <span>Open Existing Record</span>
+                <ExternalLink className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setDuplicateWarning({ found: false })}
+                className="px-2 py-1 text-amber-700 hover:text-amber-900 text-[11px]"
+              >
+                Continue Anyway
+              </button>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -100,12 +170,13 @@ export function AddProspectModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase font-mono block mb-1">
-                Phone Number
+                Phone Number (Duplicate Protected)
               </label>
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                onBlur={handleCheckDuplicate}
                 placeholder="+61 412 000 111"
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm text-slate-900 bg-slate-50 focus:bg-white outline-none"
               />
@@ -132,18 +203,16 @@ export function AddProspectModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase font-mono block mb-1">
-                Initial Stage
+                Email Address
               </label>
-              <select
-                value={stage}
-                onChange={(e) => setStage(e.target.value as Lead['stage'])}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm text-slate-900 bg-slate-50 outline-none"
-              >
-                <option value="Imported">Imported</option>
-                <option value="Engaged">Engaged</option>
-                <option value="Qualified">Qualified</option>
-                <option value="Committed">Committed</option>
-              </select>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={handleCheckDuplicate}
+                placeholder="customer@example.com"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm text-slate-900 bg-slate-50 focus:bg-white outline-none"
+              />
             </div>
 
             <div>
