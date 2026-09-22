@@ -322,23 +322,24 @@ export default function SalesFloorApp() {
     ]);
 
     try {
-      await messageApi.sendMessage({
+      const res = await messageApi.sendMessage({
         phone: messageLead?.phone || '+61412890234',
         body: message,
         client_name: recipientName,
         client_id: messageLead?._id,
       });
 
+      const isSim = (res as any)?.simulated;
       addToast(
         'success',
-        'SMS Outreach Dispatched',
-        `Message sent to ${recipientName} via BYD Verified MobileMessage Gateway.`
+        isSim ? 'SMS Outreach Dispatched (Simulation)' : 'SMS Outreach Dispatched',
+        `Message sent to ${recipientName} via MobileMessage Gateway.`
       );
-    } catch (err) {
+    } catch (err: any) {
       addToast(
-        'success',
-        'SMS Outreach Queued',
-        `Message recorded for ${recipientName} via verified gateway.`
+        'error',
+        'SMS Outreach Failed',
+        err.message || `Failed to dispatch message to ${recipientName}.`
       );
     }
   };
