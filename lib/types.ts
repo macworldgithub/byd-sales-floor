@@ -9,6 +9,7 @@ export interface Lead {
   stage?: string;
   status?: string;
   source?: string;
+  platform?: string;
   lastTouch?: string;
   action?: string;
   priority?: string | boolean;
@@ -19,8 +20,23 @@ export interface Lead {
   email?: string;
   notes?: string;
   leadIdShort?: string;
+  dealer?: string;
+  dealerName?: string;
+  virtualyardId?: string;
+  vyStage?: string;
+  vyStatus?: string;
+  tag?: string;
+  tags?: string[];
+  testDrive?: {
+    testDriveDate?: string | null;
+    location?: string;
+    status?: string;
+    confirmed?: boolean;
+  };
   createdAt?: string;
+  updatedAt?: string;
 }
+
 
 export interface Delivery {
   _id?: string;
