@@ -136,6 +136,68 @@ export const appointmentApi = {
     fetchApi<Appointment>('/appointments', { method: 'POST', body: JSON.stringify(data) }),
   updateAppointment: (id: string, data: Partial<Appointment>) =>
     fetchApi<Appointment>(`/appointments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  checkConflict: (start: string, durationMinutes = 45, consultant?: string) =>
+    fetchApi<{ hasConflict: boolean; count: number; conflicts: any[] }>('/appointments/check-conflict', {
+      method: 'POST',
+      body: JSON.stringify({ start, durationMinutes, consultant }),
+    }),
+  getExportIcsUrl: () => `${BASE_URL}/appointments/export.ics`,
+};
+
+// ─── CRM Timeline & Scoreboard Methods ────────────────────────────────────────
+
+export const crmApi = {
+  getCustomerTimeline: (customerId: string) =>
+    fetchApi<any[]>(`/crm/customers/${customerId}/timeline`),
+  logPhoneCall: (
+    customerId: string,
+    data: {
+      direction?: 'Inbound' | 'Outbound';
+      outcome: string;
+      notes?: string;
+      durationSeconds?: number;
+      consultantName?: string;
+    }
+  ) =>
+    fetchApi<any>(`/crm/customers/${customerId}/calls`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getBoardMe: () => fetchApi<any>('/crm/boards/me'),
+  getBoardTeam: () => fetchApi<any>('/crm/boards/team'),
+  getTargets: () => fetchApi<any>('/crm/targets'),
+  updateTarget: (data: { period: string; targetUnitCount: number; targetRevenue?: number }) =>
+    fetchApi<any>('/crm/targets', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// ─── Automated Follow-up Sequences Methods ────────────────────────────────────
+
+export const sequenceApi = {
+  getSequences: () => fetchApi<any[]>('/sequences'),
+  enrollLead: (sequenceId: string, payload: { leadId?: string; prospectName: string; phone: string; preferredModel?: string }) =>
+    fetchApi<any>(`/sequences/${sequenceId}/enroll`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  toggleSequence: (sequenceId: string, active: boolean) =>
+    fetchApi<any>(`/sequences/${sequenceId}/toggle`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active }),
+    }),
+};
+
+// ─── Inventory & Soft Hold Methods ────────────────────────────────────────────
+
+export const inventoryApi = {
+  softHold: (id: string, payload: { prospectName: string; notes?: string }) =>
+    fetchApi<any>(`/inventory/${id}/soft-hold`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  releaseHold: (id: string) =>
+    fetchApi<any>(`/inventory/${id}/release-hold`, {
+      method: 'POST',
+    }),
 };
 
 // ─── Conversations & Messaging Methods ─────────────────────────────────────────
@@ -166,6 +228,8 @@ export const templateApi = {
   getTemplates: () => fetchApi<TemplatePack[]>('/templates'),
   createTemplate: (data: Partial<TemplatePack>) =>
     fetchApi<TemplatePack>('/templates', { method: 'POST', body: JSON.stringify(data) }),
+  deleteTemplate: (id: string) =>
+    fetchApi<void>(`/templates/${id}`, { method: 'DELETE' }),
 };
 
 // ─── Search & Duplicate Check Methods ──────────────────────────────────────────

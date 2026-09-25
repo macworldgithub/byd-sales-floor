@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, AlertTriangle, CheckCircle, ShieldAlert } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { ASSET_PATHS } from '@/lib/data';
+import { appointmentApi } from '@/lib/api';
 
 interface BookTestDriveModalProps {
   isOpen: boolean;
@@ -28,10 +29,9 @@ const VEHICLE_OPTIONS = [
   'SHARK 6 PHEV · Vehicle 07',
 ];
 
-const TIME_SLOTS = ['09:00', '10:00', '11:30', '13:15', '15:00', '16:30'];
-
+const TIME_SLOTS = ['09:00', '10:00', '11:30', '13:15', '14:30', '15:45', '17:00'];
 const DURATION_OPTIONS = ['30 minutes', '45 minutes', '60 minutes', '90 minutes'];
-const LOCATION_OPTIONS = ['Demo loop A', 'Demo loop B', 'Demo loop C', 'Custom route'];
+const LOCATION_OPTIONS = ['Demo loop A (Highway & CBD)', 'Demo loop B (Urban Dynamic)', 'Demo loop C (Suburban)', 'Custom Route'];
 
 export function BookTestDriveModal({
   isOpen,
@@ -42,9 +42,41 @@ export function BookTestDriveModal({
   const [customerName, setCustomerName] = useState(lead?.name ?? '');
   const [vehicle, setVehicle] = useState('SEALION 7 Premium · Vehicle 03');
   const [selectedSlot, setSelectedSlot] = useState('13:15');
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [duration, setDuration] = useState('45 minutes');
-  const [location, setLocation] = useState('Demo loop B');
+  const [location, setLocation] = useState('Demo loop B (Urban Dynamic)');
   const [sendConfirmation, setSendConfirmation] = useState(true);
+  const [conflictWarning, setConflictWarning] = useState<string | null>(null);
+  const [isCheckingConflict, setIsCheckingConflict] = useState(false);
+
+  useEffect(() => {
+    if (lead?.name) setCustomerName(lead.name);
+  }, [lead]);
+
+  // Check conflicts whenever slot, date, or vehicle changes
+  useEffect(() => {
+    if (!isOpen) return;
+    const checkConflict = async () => {
+      setIsCheckingConflict(true);
+      try {
+        const startIso = `${selectedDate}T${selectedSlot}:00`;
+        const durationMins = parseInt(duration, 10) || 45;
+        const res = await appointmentApi.checkConflict(startIso, durationMins);
+        if (res.data?.hasConflict) {
+          setConflictWarning(`Conflict detected: ${res.data.count} existing booking(s) overlap with this time window.`);
+        } else {
+          setConflictWarning(null);
+        }
+      } catch {
+        setConflictWarning(null);
+      } finally {
+        setIsCheckingConflict(false);
+      }
+    };
+
+    const timer = setTimeout(checkConflict, 300);
+    return () => clearTimeout(timer);
+  }, [selectedSlot, selectedDate, duration, isOpen]);
 
   if (!isOpen) return null;
 
@@ -55,7 +87,7 @@ export function BookTestDriveModal({
       model: vehicle.split(' · ')[0],
       loop: location,
       time: selectedSlot,
-      date: 'Saturday, 13 September 2026',
+      date: selectedDate,
     });
     onClose();
   };
@@ -77,10 +109,9 @@ export function BookTestDriveModal({
         >
           <img
             src={ASSET_PATHS.testDrive}
-            alt="SEALION 7 Premium demo fleet"
+            alt="Demo fleet"
             className="absolute inset-0 w-full h-full object-cover"
           />
-          {/* Deep gradient overlay */}
           <div
             className="absolute inset-0"
             style={{
@@ -88,7 +119,6 @@ export function BookTestDriveModal({
                 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 55%, transparent 100%)',
             }}
           />
-          {/* Fleet info */}
           <div className="relative z-10 p-6 pb-7">
             <p
               className="font-mono text-[10px] font-bold tracking-widest mb-2"
@@ -96,94 +126,114 @@ export function BookTestDriveModal({
             >
               Demo Fleet
             </p>
-            <h3
-              className="font-condensed text-white text-2xl font-semibold leading-tight"
-              style={{ letterSpacing: '-0.01em' }}
-            >
-              SEALION 7 Premium
+            <h3 className="font-condensed text-white text-2xl font-semibold leading-tight">
+              {vehicle.split(' · ')[0]}
             </h3>
-            <p className="mt-1 text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              Vehicle 03 · 68% charge · ready
+            <p className="mt-1 text-sm text-slate-300">
+              {vehicle.split(' · ')[1] || 'Vehicle 03'} · ACMA Compliant Confirmation Ready
             </p>
           </div>
         </div>
 
         {/* ── Right panel: form ───────────────────────────── */}
         <div className="flex-1 flex flex-col overflow-y-auto">
-          {/* Drag handle */}
-          <div className="flex justify-center pt-4 pb-1">
-            <div className="w-10 h-1 rounded-full bg-slate-200" />
-          </div>
-
           {/* Header */}
-          <div className="px-8 pt-4 pb-5 text-center relative">
+          <div className="px-8 pt-6 pb-4 text-center relative border-b border-slate-100">
             <button
               onClick={onClose}
-              className="absolute right-5 top-4 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors"
+              className="absolute right-5 top-5 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors"
               aria-label="Close"
             >
               <X className="w-4 h-4" />
             </button>
             <h2 className="text-xl font-semibold text-slate-900" style={{ letterSpacing: '-0.02em' }}>
-              {lead ? `Book ${lead.name.split(' ')[0]}'s test drive` : 'Book test drive'}
+              {lead ? `Book ${lead.name.split(' ')[0]}'s Test Drive` : 'Book Test Drive'}
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Conflict-safe booking across the consultant, customer and demo fleet.
+            <p className="mt-1 text-xs text-slate-500">
+              Real-time conflict detection across consultant, customer, and demo vehicle bay.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="px-8 pb-6 space-y-5">
-            {/* Customer */}
+          <form onSubmit={handleSubmit} className="px-8 py-5 space-y-4">
+            {/* Conflict Warning Banner */}
+            {conflictWarning && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-medium animate-in fade-in">
+                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="flex-1">{conflictWarning}</span>
+                <span className="text-[10px] font-bold uppercase bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded">
+                  Override Available
+                </span>
+              </div>
+            )}
+
+            {/* Customer Name */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Customer
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Customer Name
               </label>
               <input
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Customer name"
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#e60012] focus:border-transparent transition"
+                placeholder="Full customer name"
+                required
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#e60012]"
               />
             </div>
 
-            {/* Vehicle */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Vehicle
-              </label>
-              <div className="relative">
+            {/* Date & Vehicle in 2 cols */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Appointment Date
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#e60012]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Model & Demo Unit
+                </label>
                 <select
                   value={vehicle}
                   onChange={(e) => setVehicle(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#e60012] focus:border-transparent transition pr-10 cursor-pointer"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#e60012]"
                 >
                   {VEHICLE_OPTIONS.map((v) => (
                     <option key={v} value={v}>{v}</option>
                   ))}
                 </select>
-                <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
               </div>
             </div>
 
             {/* Time Slots */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Available Saturday slots
-              </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Select Time Slot
+                </label>
+                {isCheckingConflict && (
+                  <span className="text-[10px] text-slate-400 font-mono animate-pulse">
+                    Checking calendar conflicts...
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
                 {TIME_SLOTS.map((slot) => (
                   <button
                     key={slot}
                     type="button"
                     onClick={() => setSelectedSlot(slot)}
-                    className="py-3 rounded-xl text-sm font-semibold transition-all"
+                    className="py-2 rounded-lg text-xs font-semibold transition-all"
                     style={{
                       background: selectedSlot === slot ? '#171b22' : '#ffffff',
                       color: selectedSlot === slot ? '#ffffff' : '#374151',
-                      border: selectedSlot === slot ? '1.5px solid #171b22' : '1.5px solid #e5e7eb',
+                      border: selectedSlot === slot ? '1.5px solid #171b22' : '1px solid #e5e7eb',
                     }}
                   >
                     {slot}
@@ -192,96 +242,71 @@ export function BookTestDriveModal({
               </div>
             </div>
 
-            {/* Duration + Location */}
+            {/* Duration + Route */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                   Duration
                 </label>
-                <div className="relative">
-                  <select
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#e60012] focus:border-transparent transition pr-8 cursor-pointer"
-                  >
-                    {DURATION_OPTIONS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                  <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+                <select
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none"
+                >
+                  {DURATION_OPTIONS.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Location
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Demo Route Loop
                 </label>
-                <div className="relative">
-                  <select
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#e60012] focus:border-transparent transition pr-8 cursor-pointer"
-                  >
-                    {LOCATION_OPTIONS.map((l) => (
-                      <option key={l} value={l}>{l}</option>
-                    ))}
-                  </select>
-                  <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+                <select
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none"
+                >
+                  {LOCATION_OPTIONS.map((l) => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Send confirmation checkbox */}
-            <label
-              className="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 bg-white p-4"
-              style={{ userSelect: 'none' }}
-            >
-              <div className="mt-0.5 shrink-0">
-                <input
-                  type="checkbox"
-                  checked={sendConfirmation}
-                  onChange={(e) => setSendConfirmation(e.target.checked)}
-                  className="sr-only"
-                />
-                <div
-                  className="w-5 h-5 rounded flex items-center justify-center transition-colors"
-                  style={{
-                    background: sendConfirmation ? '#e60012' : '#ffffff',
-                    border: sendConfirmation ? '2px solid #e60012' : '2px solid #d1d5db',
-                  }}
-                >
-                  {sendConfirmation && (
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-              </div>
+            {/* Send Confirmation Checkbox */}
+            <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 bg-white p-3">
+              <input
+                type="checkbox"
+                checked={sendConfirmation}
+                onChange={(e) => setSendConfirmation(e.target.checked)}
+                className="mt-1"
+              />
               <div>
-                <p className="text-sm font-semibold text-slate-900">Send confirmation now</p>
-                <p className="text-xs text-slate-500 mt-0.5">SMS + email, with reminders at 24h and 2h.</p>
+                <p className="text-xs font-bold text-slate-900">
+                  Send Instant Confirmation SMS & iCal Invite
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Includes registered sender ID, navigation pin to Melbourne CBD, and 24h reminder.
+                </p>
               </div>
             </label>
 
-            {/* Action buttons */}
-            <div className="flex gap-3 pt-1">
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 py-3.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="flex-1 py-3.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all"
-                style={{ background: '#e60012', boxShadow: '0 6px 20px rgba(230,0,18,0.28)' }}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-2 bg-[#e60012] hover:bg-[#c90010] shadow-md transition-colors"
               >
                 <Calendar className="w-4 h-4" />
-                Confirm booking
+                <span>Confirm & Stage Vehicle</span>
               </button>
             </div>
           </form>

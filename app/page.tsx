@@ -13,6 +13,8 @@ import { ConversationsView } from '@/components/views/ConversationsView';
 import { AllocationView } from '@/components/views/AllocationView';
 import { PerformanceView } from '@/components/views/PerformanceView';
 import { MoreView } from '@/components/views/MoreView';
+import { SequencesView } from '@/components/views/SequencesView';
+import { TemplateStudioView } from '@/components/views/TemplateStudioView';
 import { Customer360Modal } from '@/components/modals/Customer360Modal';
 import { BookTestDriveModal } from '@/components/modals/BookTestDriveModal';
 import { AddProspectModal } from '@/components/modals/AddProspectModal';
@@ -504,6 +506,7 @@ export default function SalesFloorApp() {
                 <TodayView
                   leads={leads}
                   timelineEvents={timelineEvents}
+                  deliveries={deliveries}
                   onSelectLead={handleSelectLead}
                   onOpenBookDrive={handleOpenBookDrive}
                   onOpenAddProspect={() => setIsAddProspectOpen(true)}
@@ -534,7 +537,6 @@ export default function SalesFloorApp() {
                 <DeliveriesView
                   deliveries={deliveries}
                   onOpenMessage={(l) => handleOpenMessage(l)}
-                  onCompleteHandover={handleCompleteHandover}
                 />
               )}
 
@@ -562,6 +564,10 @@ export default function SalesFloorApp() {
                   onOpenAddProspect={() => setIsAddProspectOpen(true)}
                 />
               )}
+
+              {activeTab === 'sequences' && <SequencesView />}
+
+              {activeTab === 'templates' && <TemplateStudioView />}
             </motion.div>
           </AnimatePresence>
         </main>

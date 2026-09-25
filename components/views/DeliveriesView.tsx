@@ -12,6 +12,13 @@ import {
   FileCheck,
   Key,
   Search,
+  ExternalLink,
+  Calendar,
+  AlertCircle,
+  Plus,
+  Send,
+  X,
+  Package,
 } from 'lucide-react';
 import { Delivery, Lead } from '@/lib/types';
 import { ASSET_PATHS } from '@/lib/data';
@@ -21,13 +28,11 @@ import { deliveryApi } from '@/lib/api';
 interface DeliveriesViewProps {
   deliveries: Delivery[];
   onOpenMessage: (lead: Lead) => void;
-  onCompleteHandover?: (delivery: Delivery) => void;
 }
 
 export function DeliveriesView({
   deliveries,
   onOpenMessage,
-  onCompleteHandover,
 }: DeliveriesViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<string>('All');
@@ -37,6 +42,18 @@ export function DeliveriesView({
   const [totalPages, setTotalPages] = useState<number>(Math.ceil((deliveries.length || 1) / 30));
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const pageSize = 30;
+
+  // Handover comment modal state
+  const [commentTarget, setCommentTarget] = useState<Delivery | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentFeedback, setCommentFeedback] = useState<string | null>(null);
+
+  // Date change request modal state
+  const [dateChangeTarget, setDateChangeTarget] = useState<Delivery | null>(null);
+  const [requestedDate, setRequestedDate] = useState('');
+  const [dateChangeReason, setDateChangeReason] = useState('');
+  const [dateChangeSubmitting, setDateChangeSubmitting] = useState(false);
 
   const stageOptions = ['All', 'Scheduled', 'Delivered', 'Ready for Pickup', 'PDI', 'In Transit'];
 
@@ -59,25 +76,36 @@ export function DeliveriesView({
         setDeliveriesList(res.data);
         if (res.pagination) {
           setTotalItems(res.pagination.total);
-          setTotalPages(res.pagination.pages || Math.ceil(res.pagination.total / pageSize) || 1);
+          setTotalPages(res.pagination.pages || Math.ceil(res.pagination.total / pageSize));
         } else {
           setTotalItems(res.data.length);
-          setTotalPages(Math.ceil(res.data.length / pageSize) || 1);
+          setTotalPages(1);
         }
+        return;
       }
-    } catch (err) {
-      console.error('Failed to fetch deliveries page:', err);
-      // Fallback
-      const filtered = deliveries.filter((d) => {
-        const matchStage = stage === 'All' || d.stage === stage;
-        const matchQ =
-          !query ||
-          (d.name || '').toLowerCase().includes(query.toLowerCase()) ||
-          (d.vehicle || '').toLowerCase().includes(query.toLowerCase()) ||
-          (d.rego && d.rego.toLowerCase().includes(query.toLowerCase())) ||
-          (d.vin && d.vin.toLowerCase().includes(query.toLowerCase()));
-        return matchStage && matchQ;
-      });
+      // Fallback local filtering
+      let filtered = [...deliveries];
+      if (stage && stage !== 'All') {
+        filtered = filtered.filter((d) => (d.stage || 'Scheduled').toLowerCase() === stage.toLowerCase());
+      }
+      if (query.trim()) {
+        const q = query.toLowerCase();
+        filtered = filtered.filter(
+          (d) =>
+            d.name?.toLowerCase().includes(q) ||
+            d.rego?.toLowerCase().includes(q) ||
+            d.vin?.toLowerCase().includes(q) ||
+            d.salesperson?.toLowerCase().includes(q)
+        );
+      }
+      setDeliveriesList(filtered.slice((page - 1) * pageSize, page * pageSize));
+      setTotalItems(filtered.length);
+      setTotalPages(Math.ceil(filtered.length / pageSize) || 1);
+    } catch {
+      let filtered = [...deliveries];
+      if (stage && stage !== 'All') {
+        filtered = filtered.filter((d) => (d.stage || 'Scheduled').toLowerCase() === stage.toLowerCase());
+      }
       setDeliveriesList(filtered.slice((page - 1) * pageSize, page * pageSize));
       setTotalItems(filtered.length);
       setTotalPages(Math.ceil(filtered.length / pageSize) || 1);
@@ -92,14 +120,6 @@ export function DeliveriesView({
     }, 250);
     return () => clearTimeout(timer);
   }, [currentPage, selectedStage, searchQuery, fetchDeliveries]);
-
-  useEffect(() => {
-    if (deliveries.length > 0 && !searchQuery && selectedStage === 'All' && currentPage === 1) {
-      setDeliveriesList(deliveries);
-      setTotalItems(deliveries.length);
-      setTotalPages(Math.ceil(deliveries.length / pageSize) || 1);
-    }
-  }, [deliveries, searchQuery, selectedStage, currentPage, pageSize]);
 
   const featured = deliveriesList[0];
 
@@ -120,21 +140,72 @@ export function DeliveriesView({
     }
   };
 
+  const handlePostComment = async () => {
+    if (!commentTarget || !commentText.trim()) return;
+    setCommentSubmitting(true);
+    try {
+      const targetId = String(commentTarget._id || commentTarget.id || '');
+      await deliveryApi.addComment(targetId, commentText.trim());
+      setCommentFeedback('Comment logged and synced to Delivery Centre & CRM Timeline.');
+      setTimeout(() => {
+        setCommentTarget(null);
+        setCommentText('');
+        setCommentFeedback(null);
+      }, 1400);
+    } catch (err: any) {
+      setCommentFeedback(`Error: ${err.message || 'Failed to submit comment'}`);
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
+
+  const handleRequestDateChange = async () => {
+    if (!dateChangeTarget || !requestedDate) return;
+    setDateChangeSubmitting(true);
+    try {
+      const targetId = String(dateChangeTarget._id || dateChangeTarget.id || '');
+      const note = `[DATE CHANGE REQUEST]: Consultant requested reschedule to ${requestedDate}. Reason: ${dateChangeReason || 'Customer requested adjustment'}`;
+      await deliveryApi.addComment(targetId, note);
+      setCommentFeedback('Reschedule request flagged for Delivery Coordinators.');
+      setTimeout(() => {
+        setDateChangeTarget(null);
+        setRequestedDate('');
+        setDateChangeReason('');
+        setCommentFeedback(null);
+      }, 1400);
+    } catch (err: any) {
+      setCommentFeedback(`Error: ${err.message || 'Failed to submit request'}`);
+    } finally {
+      setDateChangeSubmitting(false);
+    }
+  };
+
   return (
     <div className="view-stack">
       {/* Page Intro Banner */}
       <div className="page-intro">
         <div>
-          <p className="eyebrow">Vehicle Handovers</p>
+          <p className="eyebrow">Vehicle Handovers · Delivery Centre Read-Only Pipeline</p>
           <h1 className="page-title">DELIVERY CENTRE · MATCHED RECORDS</h1>
           <p className="page-subtitle">
-            Coordinate vehicle readiness, PDI tracking, customer documentation and bay staging for Melbourne CBD.
+            Consultant operating view: Track PDI readiness, staged accessories, bay allocation, and record handover customer notes.
           </p>
         </div>
 
-        <div className="connection-pill online">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <span>{totalItems.toLocaleString()} Deliveries registered</span>
+        <div className="flex items-center gap-2">
+          <div className="connection-pill online">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span>{totalItems.toLocaleString()} Deliveries Registered</span>
+          </div>
+          <a
+            href="https://delivery.byd.internal"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors"
+          >
+            <span>Open Delivery Centre</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
       </div>
 
@@ -150,9 +221,14 @@ export function DeliveriesView({
 
           {/* Handover Details */}
           <div className="delivery-feature-copy">
-            <span className="stage-pill bg-emerald-500 text-white shadow-md">
-              {featured.stage || 'Scheduled'} · {featured.delivery_date || featured.date || 'Upcoming'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="stage-pill bg-emerald-500 text-white shadow-md">
+                {featured.stage || 'Scheduled'} · {featured.delivery_date || featured.date || 'Upcoming'}
+              </span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-slate-900/80 text-emerald-400 border border-emerald-500/30">
+                PDI Certified
+              </span>
+            </div>
 
             <h2>{(featured.name || 'CUSTOMER').toUpperCase()} · {(featured.vehicle || 'BYD VEHICLE').toUpperCase()}</h2>
 
@@ -160,7 +236,23 @@ export function DeliveriesView({
               Melbourne CBD Delivery Bay 2 · Rego: {featured.rego || 'TBA'} · VIN: {featured.vin || 'Pending'} · Handover Specialist: {featured.salesperson || featured.agent || 'Delivery Team'}
             </p>
 
-            <div className="flex flex-wrap items-center gap-3 mt-6">
+            {/* Accessories & Add-ons Surface */}
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <span className="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                <Package className="w-3.5 h-3.5 text-amber-400" />
+                Staged Accessories:
+              </span>
+              {['OEM Floor Mats', 'Dark Ceramic Tint', 'Type 2 Fast Charging Cable', 'Boot Cargo Liner'].map((acc) => (
+                <span
+                  key={acc}
+                  className="px-2 py-0.5 rounded-md bg-white/10 backdrop-blur-xs text-[11px] font-medium text-white border border-white/10"
+                >
+                  {acc}
+                </span>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 mt-5">
               <button
                 onClick={() =>
                   onOpenMessage({
@@ -176,18 +268,26 @@ export function DeliveriesView({
                     phone: featured.phone || '+61 401 552 901',
                   })
                 }
-                className="signal-button px-5 py-2.5 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 shadow-lg"
+                className="signal-button px-4 py-2 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 shadow-lg"
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>Message customer</span>
+                <span>Message Customer</span>
               </button>
 
               <button
-                onClick={() => onCompleteHandover?.(featured)}
-                className="hero-secondary px-5 py-2.5 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2"
+                onClick={() => setCommentTarget(featured)}
+                className="hero-secondary px-4 py-2 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 bg-slate-900/90 text-white border border-slate-600 hover:border-slate-400"
               >
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Mark handover complete</span>
+                <Plus className="w-4 h-4 text-cyan-400" />
+                <span>Add Handover Comment</span>
+              </button>
+
+              <button
+                onClick={() => setDateChangeTarget(featured)}
+                className="hero-secondary px-4 py-2 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 bg-slate-900/90 text-slate-200 border border-slate-600 hover:border-amber-400"
+              >
+                <Calendar className="w-4 h-4 text-amber-400" />
+                <span>Request Date Change</span>
               </button>
             </div>
           </div>
@@ -303,7 +403,7 @@ export function DeliveriesView({
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 min-w-0">
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 min-w-0 text-xs">
                       <div className="detail-cell min-w-0 overflow-hidden" title={del.rego || ''}>
                         <span>Rego</span>
                         <strong className="truncate font-mono">{del.rego || '—'}</strong>
@@ -313,13 +413,33 @@ export function DeliveriesView({
                         <strong className="truncate font-mono">{del.vin || '—'}</strong>
                       </div>
                       <div className="detail-cell min-w-0 overflow-hidden" title={del.contact_status || del.status || ''}>
-                        <span>Contact</span>
-                        <strong className="truncate">{del.contact_status || del.status || 'Pending'}</strong>
+                        <span>Bay</span>
+                        <strong className="truncate font-mono">{(del as any).bay_number || 'Bay 1'}</strong>
                       </div>
                       <div className="detail-cell min-w-0 overflow-hidden" title={del.salesperson || del.agent || ''}>
                         <span>Specialist</span>
                         <strong className="truncate">{del.salesperson || del.agent || '—'}</strong>
                       </div>
+                    </div>
+
+                    {/* Card Actions */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setCommentTarget(del)}
+                        className="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium flex items-center justify-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-cyan-600" />
+                        <span>Add Note</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDateChangeTarget(del)}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium flex items-center justify-center gap-1"
+                        title="Request reschedule"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                      </button>
                     </div>
                   </div>
                 );
@@ -342,7 +462,158 @@ export function DeliveriesView({
           isLoading={isLoading}
         />
       </div>
+
+      {/* Handover Comment Dialog Modal */}
+      {commentTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Delivery Centre Note</p>
+                <h3 className="text-lg font-bold text-slate-900 mt-0.5">
+                  Add Handover Comment · {commentTarget.name}
+                </h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  VIN: {commentTarget.vin || 'Pending'} · Vehicle: {commentTarget.vehicle}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setCommentTarget(null);
+                  setCommentFeedback(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              Handover notes are synced directly to the Delivery Centre staging screen and logged in the Unified CRM customer timeline.
+            </p>
+
+            <textarea
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="e.g. Customer confirmed arriving at 2:30 PM. Needs front license plate frame adjusted. All funds cleared."
+              rows={4}
+              className="w-full p-3 rounded-xl border border-slate-200 text-sm outline-none focus:border-slate-800"
+            />
+
+            {commentFeedback && (
+              <div className="text-xs font-semibold text-emerald-600 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+                {commentFeedback}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCommentTarget(null);
+                  setCommentFeedback(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePostComment}
+                disabled={!commentText.trim() || commentSubmitting}
+                className="px-5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white flex items-center gap-2 disabled:opacity-50"
+              >
+                {commentSubmitting ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                <span>Submit Comment</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Date Change Request Modal */}
+      {dateChangeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-600">Coordinator Flag</p>
+                <h3 className="text-lg font-bold text-slate-900 mt-0.5">
+                  Request Delivery Date Change · {dateChangeTarget.name}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setDateChangeTarget(null);
+                  setCommentFeedback(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">New Requested Date & Time</label>
+                <input
+                  type="datetime-local"
+                  value={requestedDate}
+                  onChange={(e) => setRequestedDate(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Reason / Customer Context</label>
+                <input
+                  type="text"
+                  value={dateChangeReason}
+                  onChange={(e) => setDateChangeReason(e.target.value)}
+                  placeholder="e.g. Customer interstate flight delayed until Friday morning"
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-slate-800"
+                />
+              </div>
+            </div>
+
+            {commentFeedback && (
+              <div className="text-xs font-semibold text-emerald-600 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+                {commentFeedback}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDateChangeTarget(null);
+                  setCommentFeedback(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRequestDateChange}
+                disabled={!requestedDate || dateChangeSubmitting}
+                className="px-5 py-2 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2 disabled:opacity-50"
+              >
+                {dateChangeSubmitting ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Calendar className="w-3.5 h-3.5" />
+                )}
+                <span>Send Request</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

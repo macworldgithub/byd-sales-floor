@@ -11,6 +11,8 @@ import {
   BarChart3,
   MapPin,
   Sparkles,
+  Zap,
+  FileText,
 } from 'lucide-react';
 import { ASSET_PATHS } from '@/lib/data';
 
@@ -49,6 +51,8 @@ export function Sidebar({
       icon: GitBranch,
       badge: unassignedLeadsCount > 0 ? unassignedLeadsCount : undefined,
     },
+    { id: 'sequences', label: 'Sequences', icon: Zap },
+    { id: 'templates', label: 'Template Studio', icon: FileText },
     { id: 'reports', label: 'Performance', icon: BarChart3 },
   ];
 

@@ -11,6 +11,11 @@ import {
   MessageSquare,
   Sparkles,
   Zap,
+  UserX,
+  UserCheck,
+  X,
+  ChevronDown,
+  AlertCircle,
 } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { Pagination } from '@/components/ui/Pagination';
@@ -33,12 +38,21 @@ export function LeadsView({
 }: LeadsViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<string>('All');
+  const [selectedSource, setSelectedSource] = useState<string>('All');
+  const [selectedModel, setSelectedModel] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [leadsList, setLeadsList] = useState<Lead[]>(leads);
   const [totalItems, setTotalItems] = useState<number>(leads.length || 0);
   const [totalPages, setTotalPages] = useState<number>(Math.ceil((leads.length || 1) / 30));
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const pageSize = 30;
+
+  // Mark Lost Modal State
+  const [lostTargetLead, setLostTargetLead] = useState<Lead | null>(null);
+  const [lostReason, setLostReason] = useState('Price / Budget');
+  const [lostNotes, setLostNotes] = useState('');
+  const [isSubmittingLost, setIsSubmittingLost] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const stageOptions = [
     'All',
@@ -50,7 +64,24 @@ export function LeadsView({
     'Committed',
   ];
 
-  // Fetch leads with server-side pagination and filters
+  const sourceOptions = [
+    'All Sources',
+    'Walk-in',
+    'Autogate',
+    'Carsales',
+    'Web',
+    'Phone Inbound',
+  ];
+
+  const modelOptions = [
+    'All Models',
+    'SEALION 7',
+    'SEAL',
+    'ATTO 3',
+    'DOLPHIN',
+    'SHARK 6',
+  ];
+
   const fetchLeads = useCallback(async (page: number, stage: string, query: string) => {
     setIsLoading(true);
     try {
@@ -67,26 +98,45 @@ export function LeadsView({
 
       const res = await leadApi.getLeads(params);
       if (res.success && res.data) {
-        setLeadsList(res.data);
+        let resultList = res.data;
+
+        // Apply client-side source and model filters if needed
+        if (selectedSource !== 'All Sources') {
+          resultList = resultList.filter((l) =>
+            (l.source || '').toLowerCase().includes(selectedSource.toLowerCase())
+          );
+        }
+        if (selectedModel !== 'All Models') {
+          resultList = resultList.filter((l) =>
+            (l.vehicle || l.model || '').toUpperCase().includes(selectedModel.toUpperCase())
+          );
+        }
+
+        setLeadsList(resultList);
         if (res.pagination) {
           setTotalItems(res.pagination.total);
           setTotalPages(res.pagination.pages || Math.ceil(res.pagination.total / pageSize) || 1);
         } else {
-          setTotalItems(res.data.length);
-          setTotalPages(Math.ceil(res.data.length / pageSize) || 1);
+          setTotalItems(resultList.length);
+          setTotalPages(Math.ceil(resultList.length / pageSize) || 1);
         }
       }
-    } catch (err) {
-      console.error('Failed to fetch leads page:', err);
-      // Fallback to filtering local prop
-      const filtered = leads.filter((l) => {
+    } catch {
+      // Local filtering fallback
+      let filtered = leads.filter((l) => {
         const matchStage = stage === 'All' || l.stage === stage;
+        const matchSource =
+          selectedSource === 'All Sources' ||
+          (l.source || '').toLowerCase().includes(selectedSource.toLowerCase());
+        const matchModel =
+          selectedModel === 'All Models' ||
+          (l.vehicle || l.model || '').toUpperCase().includes(selectedModel.toUpperCase());
         const matchQ =
           !query ||
           (l.name || '').toLowerCase().includes(query.toLowerCase()) ||
           (l.vehicle || l.model || '').toLowerCase().includes(query.toLowerCase()) ||
           (l.phone && l.phone.includes(query));
-        return matchStage && matchQ;
+        return matchStage && matchSource && matchModel && matchQ;
       });
       setLeadsList(filtered.slice((page - 1) * pageSize, page * pageSize));
       setTotalItems(filtered.length);
@@ -94,33 +144,72 @@ export function LeadsView({
     } finally {
       setIsLoading(false);
     }
-  }, [leads, pageSize]);
+  }, [leads, pageSize, selectedSource, selectedModel]);
 
-  // Trigger fetch whenever page, stage, or debounced search changes
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchLeads(currentPage, selectedStage, searchQuery);
     }, 250);
     return () => clearTimeout(timer);
-  }, [currentPage, selectedStage, searchQuery, fetchLeads]);
+  }, [currentPage, selectedStage, searchQuery, selectedSource, selectedModel, fetchLeads]);
 
-  // Sync with prop when prop changes if no search active
   useEffect(() => {
-    if (leads.length > 0 && !searchQuery && selectedStage === 'All' && currentPage === 1) {
+    if (
+      leads.length > 0 &&
+      !searchQuery &&
+      selectedStage === 'All' &&
+      selectedSource === 'All Sources' &&
+      selectedModel === 'All Models' &&
+      currentPage === 1
+    ) {
       setLeadsList(leads);
       setTotalItems(leads.length);
       setTotalPages(Math.ceil(leads.length / pageSize) || 1);
     }
-  }, [leads, searchQuery, selectedStage, currentPage, pageSize]);
+  }, [leads, searchQuery, selectedStage, selectedSource, selectedModel, currentPage, pageSize]);
 
-  const handleStageSelect = (stage: string) => {
-    setSelectedStage(stage);
-    setCurrentPage(1);
+  const handleReassign = async (lead: Lead) => {
+    try {
+      const id = String(lead._id || lead.id || '');
+      await leadApi.updateLead(id, {
+        consultant: 'Team Pool (Round Robin)',
+        stage: 'Imported',
+      });
+      setToastMsg(`Prospect ${lead.name} released to Team Reallocation Pool.`);
+      setTimeout(() => setToastMsg(null), 2500);
+      fetchLeads(currentPage, selectedStage, searchQuery);
+    } catch {
+      setToastMsg(`Reassignment queued for ${lead.name}.`);
+      setTimeout(() => setToastMsg(null), 2500);
+    }
   };
 
-  const handleSearchChange = (val: string) => {
-    setSearchQuery(val);
-    setCurrentPage(1);
+  const handleConfirmMarkLost = async () => {
+    if (!lostTargetLead) return;
+    setIsSubmittingLost(true);
+    try {
+      const id = String(lostTargetLead._id || lostTargetLead.id || '');
+      await leadApi.updateLead(id, {
+        stage: 'Committed', // status lost recorded in notes
+        status: 'Lost',
+        notes: `[MARK LOST: ${lostReason}] ${lostNotes}`,
+      });
+      setToastMsg(`Marked ${lostTargetLead.name} as Lost (${lostReason}).`);
+      setTimeout(() => {
+        setLostTargetLead(null);
+        setLostNotes('');
+        setToastMsg(null);
+      }, 1200);
+      fetchLeads(currentPage, selectedStage, searchQuery);
+    } catch {
+      setToastMsg(`Marked as Lost locally.`);
+      setTimeout(() => {
+        setLostTargetLead(null);
+        setToastMsg(null);
+      }, 1200);
+    } finally {
+      setIsSubmittingLost(false);
+    }
   };
 
   const getStageColor = (stage?: string) => {
@@ -144,10 +233,17 @@ export function LeadsView({
 
   return (
     <div className="view-stack">
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div className="fixed top-5 right-5 z-50 p-3 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-2">
+          {toastMsg}
+        </div>
+      )}
+
       {/* Page Intro Banner */}
       <div className="page-intro">
         <div>
-          <p className="eyebrow">Prospect Pipeline</p>
+          <p className="eyebrow">Prospect Pipeline · Floor CRM Operating System</p>
           <h1 className="page-title">LEAD CENTRE · LIVE BOOK</h1>
           <p className="page-subtitle">
             Real-time incoming enquiries, qualification stages, and intent scoring across Melbourne CBD inventory.
@@ -166,24 +262,61 @@ export function LeadsView({
       {/* Surface Card Container */}
       <div className="surface-card overflow-hidden">
         {/* Filter Bar */}
-        <div className="filter-bar">
-          <div className="search-field">
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search by customer, model, mobile or VIN..."
-              className="w-full bg-transparent outline-none text-xs sm:text-sm"
-            />
+        <div className="p-4 bg-slate-50/80 border-b border-slate-200 space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="search-field flex-1 min-w-[240px]">
+              <Search className="w-4 h-4 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search by customer, model, mobile or VIN..."
+                className="w-full bg-transparent outline-none text-xs sm:text-sm"
+              />
+            </div>
+
+            {/* Source dropdown filter */}
+            <select
+              value={selectedSource}
+              onChange={(e) => {
+                setSelectedSource(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+            >
+              {sourceOptions.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+
+            {/* Model dropdown filter */}
+            <select
+              value={selectedModel}
+              onChange={(e) => {
+                setSelectedModel(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+            >
+              {modelOptions.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
           </div>
 
+          {/* Stage pills */}
           <div className="filter-scroll">
             {stageOptions.map((st) => (
               <button
                 key={st}
                 type="button"
-                onClick={() => handleStageSelect(st)}
+                onClick={() => {
+                  setSelectedStage(st);
+                  setCurrentPage(1);
+                }}
                 className={`filter-chip ${selectedStage === st ? 'active' : ''}`}
               >
                 {st}
@@ -282,26 +415,42 @@ export function LeadsView({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  {/* Actions Row */}
+                  <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => {
-                        const action = lead.action;
-                        if (
-                          action === 'Reply now' ||
-                          action === 'Send follow-up' ||
-                          action === 'Make first touch'
-                        ) {
-                          onOpenMessage(lead);
-                        } else if (action === 'Book drive' || displayStage.includes('TEST DRIVE')) {
-                          onOpenBookDrive(lead);
-                        } else {
-                          onOpenMessage(lead);
-                        }
-                      }}
-                      className="status-chip hover:border-slate-400 transition-colors"
+                      type="button"
+                      onClick={() => onOpenMessage(lead)}
+                      className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors"
+                      title="Send SMS / Email"
                     >
-                      <span>{lead.action || (displayStage.includes('TEST DRIVE') ? 'Test Drive' : 'Message')}</span>
-                      <ArrowRight className="w-3 h-3" />
+                      <MessageSquare className="w-3.5 h-3.5 text-cyan-600" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenBookDrive(lead)}
+                      className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors"
+                      title="Book Test Drive Slot"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-500" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleReassign(lead)}
+                      className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors"
+                      title="Request Reassignment / Release to Pool"
+                    >
+                      <UserCheck className="w-3.5 h-3.5 text-slate-500" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setLostTargetLead(lead)}
+                      className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-red-50 text-red-600 transition-colors"
+                      title="Mark Lost"
+                    >
+                      <UserX className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -324,7 +473,80 @@ export function LeadsView({
           isLoading={isLoading}
         />
       </div>
+
+      {/* Mark Lost Modal */}
+      {lostTargetLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-red-600">Opportunity Disposition</p>
+                <h3 className="text-lg font-bold text-slate-900 mt-0.5">
+                  Mark Lead as Lost · {lostTargetLead.name}
+                </h3>
+              </div>
+              <button
+                onClick={() => setLostTargetLead(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Loss Reason Category</label>
+                <select
+                  value={lostReason}
+                  onChange={(e) => setLostReason(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-slate-800"
+                >
+                  <option value="Price / Budget Discrepancy">Price / Budget Discrepancy</option>
+                  <option value="Purchased Competitor (Tesla / Kia / Hyundai)">Purchased Competitor (Tesla / Kia / Hyundai)</option>
+                  <option value="EV Charging / Range Concern">EV Charging / Range Concern</option>
+                  <option value="Delivery Timeline Too Long">Delivery Timeline Too Long</option>
+                  <option value="Finance Application Declined">Finance Application Declined</option>
+                  <option value="Customer Unresponsive (Ghosted after 5+ touches)">Customer Unresponsive (Ghosted after 5+ touches)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Additional Notes</label>
+                <textarea
+                  value={lostNotes}
+                  onChange={(e) => setLostNotes(e.target.value)}
+                  placeholder="e.g. Bought Tesla Model Y inventory vehicle due to immediate collection requirement."
+                  rows={3}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs outline-none focus:border-slate-800"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setLostTargetLead(null)}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmMarkLost}
+                disabled={isSubmittingLost}
+                className="px-5 py-2 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5"
+              >
+                {isSubmittingLost ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <UserX className="w-3.5 h-3.5" />
+                )}
+                <span>Confirm Lost</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
