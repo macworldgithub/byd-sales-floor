@@ -43,9 +43,11 @@ export default function LoginPage() {
         {/* Brand */}
         <div className="login-brand">
           <div className="login-logo">
-            <svg viewBox="0 0 48 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-16 h-6">
-              <text x="0" y="16" fontSize="18" fontWeight="900" fill="white" fontFamily="Arial, sans-serif" letterSpacing="-0.5">BYD</text>
-            </svg>
+            <img
+              src="/images/good-showroom-mark.png"
+              alt="Good Showroom"
+              className="w-10 h-10 object-contain"
+            />
           </div>
           <div className="login-brand__text">
             <h1 className="login-brand__title">Sales Floor OS</h1>
@@ -222,12 +224,13 @@ export default function LoginPage() {
         }
         .login-logo {
           width: 52px; height: 52px;
-          background: linear-gradient(135deg, #e60012, #99000c);
+          background: #ffffff;
           border-radius: 12px;
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0;
-          box-shadow: 0 4px 24px rgba(230, 0, 18, 0.45);
-          border: 1px solid rgba(255, 255, 255, 0.15);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          padding: 6px;
         }
         .login-brand__text { flex: 1; }
         .login-brand__title {
