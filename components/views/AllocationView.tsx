@@ -32,15 +32,35 @@ export function AllocationView({
     currentPage * pageSize
   );
 
+  const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
+  const [activeDropConsultant, setActiveDropConsultant] = useState<string | null>(null);
+  const [allocationToast, setAllocationToast] = useState<string | null>(null);
+
+  const handleDropOnConsultant = (consultantName: string) => {
+    if (!draggedLeadId) return;
+    onAssignLead(draggedLeadId, consultantName);
+    setAllocationToast(`Lead assigned to ${consultantName} via Drag-and-Drop.`);
+    setDraggedLeadId(null);
+    setActiveDropConsultant(null);
+    setTimeout(() => setAllocationToast(null), 2500);
+  };
+
   return (
     <div className="view-stack">
+      {/* Toast Feedback */}
+      {allocationToast && (
+        <div className="fixed top-5 right-5 z-50 p-3 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl border border-slate-700 animate-in fade-in">
+          {allocationToast}
+        </div>
+      )}
+
       {/* Page Intro Banner */}
       <div className="page-intro">
         <div>
           <p className="eyebrow">Manager Console</p>
           <h1 className="page-title">LEAD ALLOCATION · CAPACITY ENGINE</h1>
           <p className="page-subtitle">
-            Balance incoming Carsales, Web and Walk-in enquiries dynamically according to real-time sales consultant workload and active delivery commitments.
+            Balance incoming Carsales, Web and Walk-in enquiries dynamically. Drag leads onto available consultants or use 1-tap quick assignment.
           </p>
         </div>
 
@@ -69,62 +89,73 @@ export function AllocationView({
                   All incoming leads are currently allocated.
                 </div>
               ) : (
-                paginatedUnassigned.map((lead) => (
-                  <div
-                    key={lead.id}
-                    className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3 hover:border-slate-300 transition-all"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="avatar-initials bg-white">{lead.initials}</div>
-                        <div>
-                          <strong className="text-sm text-slate-900 block font-semibold">
-                            {lead.name}
-                          </strong>
-                          <span className="text-xs text-slate-500 block font-medium">
-                            {lead.model} · via {lead.source}
+                paginatedUnassigned.map((lead) => {
+                  const leadId = String(lead._id || lead.id || '');
+                  return (
+                    <div
+                      key={lead.id}
+                      draggable={true}
+                      onDragStart={(e) => {
+                        setDraggedLeadId(leadId);
+                        e.dataTransfer.setData('text/plain', leadId);
+                      }}
+                      onDragEnd={() => setDraggedLeadId(null)}
+                      className={`p-4 rounded-xl border bg-slate-50 space-y-3 transition-all cursor-grab active:cursor-grabbing hover:border-slate-400 hover:shadow-xs ${
+                        draggedLeadId === leadId ? 'opacity-50 border-dashed border-red-400 bg-red-50/20' : 'border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="avatar-initials bg-white">{lead.initials}</div>
+                          <div>
+                            <strong className="text-sm text-slate-900 block font-semibold">
+                              {lead.name}
+                            </strong>
+                            <span className="text-xs text-slate-500 block font-medium">
+                              {lead.model} · via {lead.source}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right font-condensed">
+                          <span className="text-lg font-bold text-[#e60012] block">
+                            {lead.score} PTS
                           </span>
+                          <small className="text-[10px] text-slate-400 uppercase font-mono">
+                            Intent
+                          </small>
                         </div>
                       </div>
-                      <div className="text-right font-condensed">
-                        <span className="text-lg font-bold text-[#e60012] block">
-                          {lead.score} PTS
-                        </span>
-                        <small className="text-[10px] text-slate-400 uppercase font-mono">
-                          Intent
-                        </small>
+
+                      <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] flex items-center gap-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span>Allocated recently · Drag to assign</span>
+                      </div>
+
+                      {/* Quick Assign Buttons */}
+                      <div className="space-y-1 pt-1">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase font-mono">
+                          Assign to available consultant:
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => onAssignLead(leadId, 'Lena Park')}
+                            className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
+                          >
+                            <span>Lena Park (46%)</span>
+                            <ArrowRight className="w-3 h-3 text-slate-400" />
+                          </button>
+                          <button
+                            onClick={() => onAssignLead(leadId, 'Alex Morgan')}
+                            className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
+                          >
+                            <span>Alex Morgan (72%)</span>
+                            <ArrowRight className="w-3 h-3 text-slate-400" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] flex items-center gap-2">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span>Allocated 1 hr 54m ago · SLA warning</span>
-                    </div>
-
-                    {/* Quick Assign Buttons */}
-                    <div className="space-y-1 pt-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase font-mono">
-                        Assign to available consultant:
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => onAssignLead(lead._id || lead.id || '', 'Lena Park')}
-                          className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
-                        >
-                          <span>Lena Park (46%)</span>
-                          <ArrowRight className="w-3 h-3 text-slate-400" />
-                        </button>
-                        <button
-                          onClick={() => onAssignLead(lead._id || lead.id || '', 'Alex Morgan')}
-                          className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
-                        >
-                          <span>Alex Morgan (72%)</span>
-                          <ArrowRight className="w-3 h-3 text-slate-400" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -140,7 +171,7 @@ export function AllocationView({
           />
         </div>
 
-        {/* Right Column: Consultant Capacities */}
+        {/* Right Column: Consultant Capacities & Dropzones */}
         <div className="space-y-4">
           <div className="surface-card p-5 space-y-4">
             <div className="card-header-row !p-0 !pb-4">
@@ -149,7 +180,7 @@ export function AllocationView({
                 <h2 className="section-title">Sales Consultant Capacity</h2>
               </div>
               <span className="text-xs font-semibold text-slate-500 font-mono">
-                REAL-TIME LOAD
+                DRAG & DROP READY
               </span>
             </div>
 
@@ -163,8 +194,26 @@ export function AllocationView({
                   ? 'bg-slate-900'
                   : 'bg-emerald-500';
 
+                const isDragOver = activeDropConsultant === c.name;
+
                 return (
-                  <div key={c.id} className="consultant-dropzone">
+                  <div
+                    key={c.id}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setActiveDropConsultant(c.name);
+                    }}
+                    onDragLeave={() => setActiveDropConsultant(null)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleDropOnConsultant(c.name);
+                    }}
+                    className={`consultant-dropzone transition-all ${
+                      isDragOver
+                        ? 'border-2 border-dashed border-[#e60012] bg-red-50/40 scale-[1.02] shadow-md'
+                        : 'border border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
                     <div className="flex items-center gap-3">
                       <div className="avatar-initials bg-slate-900 text-white font-bold">
                         {c.initials}
@@ -178,6 +227,11 @@ export function AllocationView({
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5">{c.status}</p>
                       </div>
+                      {isDragOver && (
+                        <span className="text-[11px] font-bold text-[#e60012] font-mono animate-bounce">
+                          Drop to Assign
+                        </span>
+                      )}
                     </div>
 
                     <div className="capacity-block">

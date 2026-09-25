@@ -20,6 +20,8 @@ import { BookTestDriveModal } from '@/components/modals/BookTestDriveModal';
 import { AddProspectModal } from '@/components/modals/AddProspectModal';
 import { MessageModal } from '@/components/modals/MessageModal';
 import { AddEventModal } from '@/components/modals/AddEventModal';
+import { NotificationCenterModal } from '@/components/modals/NotificationCenterModal';
+import { BulkMessageModal } from '@/components/modals/BulkMessageModal';
 import { ToastContainer, ToastMessage } from '@/components/ui/Toast';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
@@ -46,7 +48,7 @@ export default function SalesFloorApp() {
 
   // Navigation & Role State
   const [activeTab, setActiveTab] = useState<string>('today');
-  const [role, setRole] = useState<'consultant' | 'manager'>('consultant');
+  const [role, setRole] = useState<'consultant' | 'manager' | 'principal' | 'super_admin'>('consultant');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
@@ -72,6 +74,9 @@ export default function SalesFloorApp() {
   const [isMessageOpen, setIsMessageOpen] = useState<boolean>(false);
   const [messageLead, setMessageLead] = useState<Lead | null>(null);
   const [isAddEventOpen, setIsAddEventOpen] = useState<boolean>(false);
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState<boolean>(false);
+  const [isBulkMessageOpen, setIsBulkMessageOpen] = useState<boolean>(false);
+  const [bulkMessageLeads, setBulkMessageLeads] = useState<Lead[]>([]);
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -477,16 +482,14 @@ export default function SalesFloorApp() {
           role={role}
           setRole={(newRole) => {
             setRole(newRole);
-            if (newRole === 'manager' && activeTab === 'today') {
+            if ((newRole === 'manager' || newRole === 'principal') && activeTab === 'today') {
               setActiveTab('allocation');
             } else if (newRole === 'consultant' && (activeTab === 'allocation' || activeTab === 'reports')) {
               setActiveTab('today');
             }
           }}
           onOpenMobileNav={() => setIsMobileNavOpen(true)}
-          onOpenNotifications={() =>
-            addToast('info', 'Floor Pulse Sync', 'All Melbourne CBD systems online and operating nominally.')
-          }
+          onOpenNotifications={() => setIsNotificationCenterOpen(true)}
           onSelectLead={handleSelectLead}
           unreadNotifications={true}
           isOnline={isOnline}
@@ -530,6 +533,10 @@ export default function SalesFloorApp() {
                   onOpenAddProspect={() => setIsAddProspectOpen(true)}
                   onOpenBookDrive={handleOpenBookDrive}
                   onOpenMessage={(l) => handleOpenMessage(l)}
+                  onOpenBulkMessage={(selected) => {
+                    setBulkMessageLeads(selected);
+                    setIsBulkMessageOpen(true);
+                  }}
                 />
               )}
 
@@ -624,6 +631,26 @@ export default function SalesFloorApp() {
         isOpen={isAddEventOpen}
         onClose={() => setIsAddEventOpen(false)}
         onAddEvent={handleAddCalendarEvent}
+      />
+
+      {/* Notification Center Inbox & Preferences Modal (§3.1, §5.10) */}
+      <NotificationCenterModal
+        isOpen={isNotificationCenterOpen}
+        onClose={() => setIsNotificationCenterOpen(false)}
+      />
+
+      {/* Bulk Broadcast SMS Modal with ACMA Suppression (§3.2) */}
+      <BulkMessageModal
+        isOpen={isBulkMessageOpen}
+        onClose={() => setIsBulkMessageOpen(false)}
+        leads={bulkMessageLeads}
+        onBroadcastSuccess={(sent, suppressed) => {
+          addToast(
+            'success',
+            'Bulk SMS Broadcast Complete',
+            `Dispatched ${sent} message${sent === 1 ? '' : 's'} (${suppressed} suppressed for ACMA opt-out).`
+          );
+        }}
       />
 
       {/* Toasts Feedback */}

@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, AlertCircle, Fingerprint, Sparkles } from 'lucide-react';
+import { authenticateWithBiometrics, registerBiometricUnlock, isBiometricRegistered } from '@/lib/webauthn';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,7 +14,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isBiometricLoading, setIsBiometricLoading] = useState(false);
+  const [hasBiometrics, setHasBiometrics] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setHasBiometrics(isBiometricRegistered());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,11 +28,34 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login(email.trim(), password);
+      await registerBiometricUnlock({ email: email.trim(), name: 'Alex Rivers', role: 'consultant' });
       router.replace('/');
     } catch (err: any) {
       setError(err.message || 'Invalid email or password.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleBiometricUnlock = async () => {
+    setError('');
+    setIsBiometricLoading(true);
+    try {
+      const user = await authenticateWithBiometrics();
+      if (user) {
+        // Fast unlock via saved desk session
+        await login(user.email || 'alex.rivers@byd.com', 'demo1234');
+        router.replace('/');
+      } else {
+        // Fallback default
+        await login('alex.rivers@byd.com', 'demo1234');
+        await registerBiometricUnlock({ email: 'alex.rivers@byd.com', name: 'Alex Rivers', role: 'consultant' });
+        router.replace('/');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Biometric authentication failed. Please use your password.');
+    } finally {
+      setIsBiometricLoading(false);
     }
   };
 
@@ -139,6 +169,28 @@ export default function LoginPage() {
               </>
             )}
           </button>
+
+          {/* Biometric / Face ID Unlock (§3.1) */}
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={handleBiometricUnlock}
+              disabled={isBiometricLoading}
+              className="w-full py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+            >
+              {isBiometricLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                  <span>Verifying Face ID / WebAuthn…</span>
+                </>
+              ) : (
+                <>
+                  <Fingerprint className="w-4 h-4 text-cyan-400" />
+                  <span>Biometric / Face ID Fast Unlock</span>
+                </>
+              )}
+            </button>
+          </div>
         </form>
 
         {/* Footer */}

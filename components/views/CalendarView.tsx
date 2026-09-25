@@ -30,7 +30,7 @@ export function CalendarView({
   onOpenAddEvent,
   onOpenBookDrive,
 }: CalendarViewProps) {
-  const [viewMode, setViewMode] = useState<'myDay' | 'team'>('myDay');
+  const [viewMode, setViewMode] = useState<'myDay' | 'week' | 'month' | 'team'>('myDay');
   const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -47,6 +47,9 @@ export function CalendarView({
     '16:00',
     '17:00',
   ];
+
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const monthDays = Array.from({ length: 30 }, (_, i) => i + 1);
 
   const getEventPosition = (time: string, end: string) => {
     const parseTime = (t: string) => {
@@ -138,13 +141,27 @@ export function CalendarView({
 
         <div className="flex flex-wrap items-center gap-2">
           {/* Segmented View Mode */}
-          <div className="segmented">
+          <div className="segmented flex flex-wrap gap-1">
             <button
               type="button"
               onClick={() => setViewMode('myDay')}
               className={viewMode === 'myDay' ? 'active' : ''}
             >
               My Day
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('week')}
+              className={viewMode === 'week' ? 'active' : ''}
+            >
+              Week View
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('month')}
+              className={viewMode === 'month' ? 'active' : ''}
+            >
+              Month View
             </button>
             <button
               type="button"
@@ -367,6 +384,135 @@ export function CalendarView({
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* View Mode: Week View (§3.2, §5.2) */}
+        {viewMode === 'week' && (
+          <div className="overflow-x-auto w-full p-4">
+            <div className="min-w-[850px] grid grid-cols-7 gap-3">
+              {daysOfWeek.map((day, dIdx) => (
+                <div key={day} className="bg-slate-50 rounded-xl p-3 border border-slate-200 flex flex-col min-h-[450px]">
+                  <div className="border-b border-slate-200 pb-2 mb-2 flex items-center justify-between">
+                    <div>
+                      <strong className="text-xs font-bold text-slate-900 block">{day}</strong>
+                      <span className="text-[10px] text-slate-500 font-mono">Sep {8 + dIdx}</span>
+                    </div>
+                    <span className="w-2 h-2 rounded-full bg-slate-300" />
+                  </div>
+
+                  <div className="flex-1 space-y-2 overflow-y-auto">
+                    {dIdx === 0 &&
+                      timelineEvents.map((evt, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => setSelectedEvent(evt)}
+                          className={`p-2 rounded-lg border text-left cursor-pointer hover:shadow-sm transition-all text-xs space-y-0.5 ${getEventClass(evt.type)}`}
+                        >
+                          <div className="flex items-center justify-between text-[10px] font-mono">
+                            <span className="font-bold uppercase">{evt.type}</span>
+                            <span>{evt.time}</span>
+                          </div>
+                          <p className="font-bold text-[11px] truncate leading-tight">{evt.title}</p>
+                          <span className="text-[10px] opacity-80 block truncate">{evt.detail}</span>
+                        </div>
+                      ))}
+
+                    {dIdx === 1 && (
+                      <div className="p-2 rounded-lg border calendar-drive text-xs space-y-0.5">
+                        <div className="flex items-center justify-between text-[10px] font-mono">
+                          <span className="font-bold uppercase">Drive</span>
+                          <span>11:00</span>
+                        </div>
+                        <p className="font-bold text-[11px]">David Chen · SEAL</p>
+                        <span className="text-[10px] opacity-80 block">Yarra Loop Demo</span>
+                      </div>
+                    )}
+
+                    {dIdx === 2 && (
+                      <div className="p-2 rounded-lg border calendar-delivery text-xs space-y-0.5">
+                        <div className="flex items-center justify-between text-[10px] font-mono">
+                          <span className="font-bold uppercase">Delivery</span>
+                          <span>14:00</span>
+                        </div>
+                        <p className="font-bold text-[11px]">Priya Nair Handover</p>
+                        <span className="text-[10px] opacity-80 block">Bay 1 · Rego Verified</span>
+                      </div>
+                    )}
+
+                    {dIdx === 4 && (
+                      <div className="p-2 rounded-lg border calendar-followup text-xs space-y-0.5">
+                        <div className="flex items-center justify-between text-[10px] font-mono">
+                          <span className="font-bold uppercase">Follow-up</span>
+                          <span>09:30</span>
+                        </div>
+                        <p className="font-bold text-[11px]">Fleet Quote Review</p>
+                        <span className="text-[10px] opacity-80 block">SolarDrive ABN</span>
+                      </div>
+                    )}
+
+                    {dIdx === 5 && (
+                      <div className="p-2 rounded-lg border calendar-drive text-xs space-y-0.5">
+                        <div className="flex items-center justify-between text-[10px] font-mono">
+                          <span className="font-bold uppercase">Drive</span>
+                          <span>10:30</span>
+                        </div>
+                        <p className="font-bold text-[11px]">Weekend VIP Slot</p>
+                        <span className="text-[10px] opacity-80 block">SEALION 7 AWD</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* View Mode: Month View (§3.2, §5.2) */}
+        {viewMode === 'month' && (
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-7 gap-1 text-center font-mono text-xs font-bold text-slate-500 py-1 border-b border-slate-100">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
+                <span key={d}>{d}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {monthDays.map((d) => (
+                <div
+                  key={d}
+                  className={`p-2.5 rounded-xl border text-left min-h-[90px] flex flex-col justify-between transition-all ${
+                    d === 8
+                      ? 'bg-red-50/50 border-[#e60012] shadow-xs'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs font-bold font-mono ${d === 8 ? 'text-[#e60012]' : 'text-slate-700'}`}>
+                      {d}
+                    </span>
+                    {d === 8 && <span className="w-1.5 h-1.5 rounded-full bg-[#e60012]" />}
+                  </div>
+
+                  <div className="space-y-1">
+                    {d === 8 && (
+                      <span className="text-[10px] font-semibold text-cyan-800 bg-cyan-100 px-1.5 py-0.5 rounded block truncate">
+                        4 Test Drives
+                      </span>
+                    )}
+                    {(d === 8 || d === 10 || d === 15) && (
+                      <span className="text-[10px] font-semibold text-red-800 bg-red-100 px-1.5 py-0.5 rounded block truncate">
+                        {d === 8 ? '2 Deliveries' : '1 Delivery'}
+                      </span>
+                    )}
+                    {d % 4 === 0 && d !== 8 && (
+                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded block truncate">
+                        Follow-ups
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

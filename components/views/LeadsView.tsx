@@ -27,6 +27,7 @@ interface LeadsViewProps {
   onOpenAddProspect: () => void;
   onOpenBookDrive: (lead?: Lead) => void;
   onOpenMessage: (lead: Lead) => void;
+  onOpenBulkMessage?: (leads: Lead[]) => void;
 }
 
 export function LeadsView({
@@ -35,11 +36,15 @@ export function LeadsView({
   onOpenAddProspect,
   onOpenBookDrive,
   onOpenMessage,
+  onOpenBulkMessage,
 }: LeadsViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<string>('All');
   const [selectedSource, setSelectedSource] = useState<string>('All');
   const [selectedModel, setSelectedModel] = useState<string>('All');
+  const [selectedScoreBand, setSelectedScoreBand] = useState<string>('All');
+  const [selectedRecency, setSelectedRecency] = useState<string>('All');
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [leadsList, setLeadsList] = useState<Lead[]>(leads);
   const [totalItems, setTotalItems] = useState<number>(leads.length || 0);
@@ -305,6 +310,36 @@ export function LeadsView({
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
+
+            {/* Score Band dropdown filter (§3.2) */}
+            <select
+              value={selectedScoreBand}
+              onChange={(e) => {
+                setSelectedScoreBand(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+            >
+              <option value="All">All Scores</option>
+              <option value="High">High Intent (80+ pts)</option>
+              <option value="Medium">Medium Intent (60-79 pts)</option>
+              <option value="Low">Low Intent (&lt;60 pts)</option>
+            </select>
+
+            {/* Recency dropdown filter (§3.2) */}
+            <select
+              value={selectedRecency}
+              onChange={(e) => {
+                setSelectedRecency(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+            >
+              <option value="All">All Time</option>
+              <option value="2h">&lt; 2 Hours (SLA Focus)</option>
+              <option value="Today">Today</option>
+              <option value="Week">This Week</option>
+            </select>
           </div>
 
           {/* Stage pills */}
@@ -325,15 +360,48 @@ export function LeadsView({
           </div>
         </div>
 
-        {/* Leads Summary Strip */}
-        <div className="leads-summary">
-          <span>
-            Active Pipeline · <strong className="text-white">{totalItems.toLocaleString()}</strong> Prospects
-          </span>
-          <div className="text-[11px] font-mono text-slate-300 flex items-center gap-3">
-            <span>Page <strong className="text-white">{currentPage}</strong> of <strong className="text-white">{totalPages}</strong></span>
-            <span>·</span>
-            <span>Median first touch: <strong className="text-white">11 min</strong></span>
+        {/* Leads Summary Strip with Bulk Broadcast Button */}
+        <div className="leads-summary flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={leadsList.length > 0 && selectedLeadIds.length === leadsList.length}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedLeadIds(leadsList.map((l) => String(l._id || l.id)));
+                } else {
+                  setSelectedLeadIds([]);
+                }
+              }}
+              className="rounded border-slate-400 cursor-pointer"
+              title="Select all on current page"
+            />
+            <span>
+              Active Pipeline · <strong className="text-white">{totalItems.toLocaleString()}</strong> Prospects
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {selectedLeadIds.length > 0 && onOpenBulkMessage && (
+              <button
+                onClick={() => {
+                  const selectedLeads = leadsList.filter((l) =>
+                    selectedLeadIds.includes(String(l._id || l.id))
+                  );
+                  onOpenBulkMessage(selectedLeads);
+                }}
+                className="px-3 py-1 rounded-lg bg-[#e60012] hover:bg-[#c91c2f] text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md animate-in fade-in"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Broadcast SMS ({selectedLeadIds.length})</span>
+              </button>
+            )}
+
+            <div className="text-[11px] font-mono text-slate-300 hidden sm:flex items-center gap-3">
+              <span>Page <strong className="text-white">{currentPage}</strong> of <strong className="text-white">{totalPages}</strong></span>
+              <span>·</span>
+              <span>Median first touch: <strong className="text-white">11 min</strong></span>
+            </div>
           </div>
         </div>
 
@@ -350,7 +418,8 @@ export function LeadsView({
             </div>
           ) : (
             leadsList.map((lead, idx) => {
-              const leadId = lead._id || lead.id || `lead-${idx}`;
+              const leadId = String(lead._id || lead.id || `lead-${idx}`);
+              const isSelected = selectedLeadIds.includes(leadId);
               const initials =
                 lead.initials ||
                 (lead.name
@@ -371,8 +440,20 @@ export function LeadsView({
               return (
                 <div
                   key={leadId}
-                  className="lead-row group"
+                  className={`lead-row group ${isSelected ? 'bg-red-50/40' : ''}`}
                 >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedLeadIds((prev) => [...prev, leadId]);
+                      } else {
+                        setSelectedLeadIds((prev) => prev.filter((id) => id !== leadId));
+                      }
+                    }}
+                    className="rounded border-slate-300 cursor-pointer mr-1"
+                  />
                   {lead.priority && lead.priority !== 'Not Set' && <span className="lead-signal" />}
                   <div className="avatar-initials">{initials}</div>
 

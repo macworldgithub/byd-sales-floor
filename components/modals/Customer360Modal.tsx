@@ -23,6 +23,7 @@ import {
   Share2,
   PhoneCall,
   Lock,
+  Unlink,
 } from 'lucide-react';
 import { Lead, Delivery, Appointment } from '@/lib/types';
 import { interpolateTemplate, DEFAULT_TEMPLATE_PACKS } from '@/lib/templateEngine';
@@ -47,7 +48,7 @@ export function Customer360Modal({
   onUpdateStage,
   onAddNote,
 }: Customer360ModalProps) {
-  const [activeTab, setActiveTab] = useState<'timeline' | 'details' | 'delivery' | 'notes'>('timeline');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'details' | 'conversations' | 'appointments' | 'delivery' | 'notes' | 'files'>('timeline');
   const [composerMode, setComposerMode] = useState<'sms' | 'note' | 'call'>('sms');
   const [composerText, setComposerText] = useState('');
   const [callOutcome, setCallOutcome] = useState('Connected - Follow-up Scheduled');
@@ -290,7 +291,7 @@ export function Customer360Modal({
               }`}
             >
               <History className="w-4 h-4" />
-              <span>Unified 360 Timeline</span>
+              <span>Journey 360</span>
             </button>
             <button
               onClick={() => setActiveTab('details')}
@@ -301,7 +302,29 @@ export function Customer360Modal({
               }`}
             >
               <Car className="w-4 h-4" />
-              <span>Lead Details & Specs</span>
+              <span>Specs & Deal</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('conversations')}
+              className={`py-3 sm:py-3.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeTab === 'conversations'
+                  ? 'border-[#e60012] text-[#e60012]'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>SMS Comms</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('appointments')}
+              className={`py-3 sm:py-3.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeTab === 'appointments'
+                  ? 'border-[#e60012] text-[#e60012]'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Test Drives</span>
             </button>
             <button
               onClick={() => setActiveTab('delivery')}
@@ -312,7 +335,7 @@ export function Customer360Modal({
               }`}
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Delivery Centre Link</span>
+              <span>Delivery Link</span>
             </button>
             <button
               onClick={() => setActiveTab('notes')}
@@ -323,7 +346,18 @@ export function Customer360Modal({
               }`}
             >
               <FileText className="w-4 h-4" />
-              <span>Notes & Audit Trail</span>
+              <span>Internal Notes</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('files')}
+              className={`py-3 sm:py-3.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeTab === 'files'
+                  ? 'border-[#e60012] text-[#e60012]'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              <span>Docs & KYC</span>
             </button>
           </div>
 
@@ -434,6 +468,58 @@ export function Customer360Modal({
             </div>
           )}
 
+          {activeTab === 'conversations' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 font-mono uppercase">SMS Outreach History</span>
+                  <button
+                    onClick={() => onOpenMessage(lead)}
+                    className="px-3 py-1 rounded-lg bg-[#e60012] text-white text-xs font-bold flex items-center gap-1"
+                  >
+                    <Send className="w-3 h-3" />
+                    <span>Send SMS</span>
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <div className="p-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-700">
+                    <div className="flex items-center justify-between mb-1">
+                      <strong className="text-slate-900">Outbound SMS · Sent</strong>
+                      <span className="text-[10px] font-mono text-slate-400">Today 09:15 AM</span>
+                    </div>
+                    <p className="text-slate-600">
+                      Hi {lead.name.split(' ')[0]}, thanks for visiting BYD Melbourne CBD today. Let me know if you&apos;d like to test drive the SEALION 7!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'appointments' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-900 uppercase font-mono">Scheduled Showroom Appointments</h4>
+                <button
+                  onClick={() => onOpenBookDrive(lead)}
+                  className="signal-button px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Book New Slot</span>
+                </button>
+              </div>
+              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <strong className="text-xs text-slate-900">Test Drive · SEALION 7 AWD</strong>
+                  <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">
+                    Confirmed
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">Melbourne CBD Demo Loop · Consultant: {lead.consultant || 'Alex Rivers'}</p>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'delivery' && (
             <div className="space-y-4">
               <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
@@ -456,6 +542,29 @@ export function Customer360Modal({
                   <strong className="text-xs text-slate-900 font-semibold">Melbourne CBD Bay 2</strong>
                 </div>
               </div>
+
+              <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                <span className="text-xs text-slate-500">Mismatched or erroneous delivery mapping?</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (confirm(`Unlink Delivery Centre association for ${lead.name}?`)) {
+                      try {
+                        await crmApi.unlinkCustomer(customerId, 'delivery');
+                        setToastMessage('Delivery record unlinked.');
+                        setTimeout(() => setToastMessage(null), 2500);
+                      } catch {
+                        setToastMessage('Record unlinked locally.');
+                        setTimeout(() => setToastMessage(null), 2500);
+                      }
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <Unlink className="w-3.5 h-3.5" />
+                  <span>Unlink Delivery Record</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -466,6 +575,31 @@ export function Customer360Modal({
                   [Showroom Log] Alex Rivers (Consultant)
                 </span>
                 Confirmed test drive preferences and sent brochure SMS via verified gateway.
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'files' && (
+            <div className="space-y-3">
+              <div className="p-4 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-slate-500" />
+                  <div>
+                    <strong className="text-xs text-slate-900 block">Contract of Sale (PDF)</strong>
+                    <span className="text-[10px] text-slate-400 font-mono">Digital Signature Verified</span>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-[#e60012] cursor-pointer hover:underline">Download</span>
+              </div>
+              <div className="p-4 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                  <div>
+                    <strong className="text-xs text-slate-900 block">Driver License ID Scan</strong>
+                    <span className="text-[10px] text-slate-400 font-mono">VIC Roads Match Valid</span>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-emerald-700">Verified</span>
               </div>
             </div>
           )}

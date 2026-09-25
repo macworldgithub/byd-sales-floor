@@ -19,7 +19,7 @@ import { ASSET_PATHS } from '@/lib/data';
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  role: 'consultant' | 'manager';
+  role: 'consultant' | 'manager' | 'principal' | 'super_admin';
   unreadConversationsCount?: number;
   unassignedLeadsCount?: number;
 }

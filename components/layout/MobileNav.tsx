@@ -20,8 +20,8 @@ interface MobileNavProps {
   setActiveTab: (tab: string) => void;
   isOpen: boolean;
   onClose: () => void;
-  role: 'consultant' | 'manager';
-  setRole: (role: 'consultant' | 'manager') => void;
+  role: 'consultant' | 'manager' | 'principal' | 'super_admin';
+  setRole: (role: 'consultant' | 'manager' | 'principal' | 'super_admin') => void;
 }
 
 export function MobileNav({

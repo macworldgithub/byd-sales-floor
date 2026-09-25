@@ -20,8 +20,8 @@ import { searchApi } from '@/lib/api';
 import { Lead, Delivery, Appointment } from '@/lib/types';
 
 interface HeaderProps {
-  role: 'consultant' | 'manager';
-  setRole: (role: 'consultant' | 'manager') => void;
+  role: 'consultant' | 'manager' | 'principal' | 'super_admin';
+  setRole: (role: 'consultant' | 'manager' | 'principal' | 'super_admin') => void;
   onOpenMobileNav: () => void;
   onOpenNotifications: () => void;
   onSelectLead?: (lead: Lead) => void;
@@ -219,7 +219,7 @@ export function Header({
           <span>{isOnline ? 'Live · AEST' : 'Offline Queue'}</span>
         </div>
 
-        {/* Role Switcher */}
+        {/* Role Switcher (§3.1) */}
         <div className="role-switch">
           <button
             type="button"
@@ -234,6 +234,13 @@ export function Header({
             className={role === 'manager' ? 'active' : ''}
           >
             Manager
+          </button>
+          <button
+            type="button"
+            onClick={() => setRole('principal')}
+            className={role === 'principal' ? 'active' : ''}
+          >
+            Principal
           </button>
         </div>
 

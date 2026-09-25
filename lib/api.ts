@@ -149,6 +149,11 @@ export const appointmentApi = {
 export const crmApi = {
   getCustomerTimeline: (customerId: string) =>
     fetchApi<any[]>(`/crm/customers/${customerId}/timeline`),
+  unlinkCustomer: (customerId: string, linkType: 'lead' | 'delivery' | 'all' = 'delivery') =>
+    fetchApi<any>(`/crm/customers/${customerId}/unlink`, {
+      method: 'POST',
+      body: JSON.stringify({ linkType }),
+    }),
   logPhoneCall: (
     customerId: string,
     data: {
@@ -220,6 +225,11 @@ export const messageApi = {
     client_name?: string;
     template_id?: string;
   }) => fetchApi('/messages/send', { method: 'POST', body: JSON.stringify(data) }),
+  bulkSend: (recipients: Array<{ phone: string; name?: string; model?: string; consultant?: string }>, messageTemplate: string) =>
+    fetchApi<{ sentCount: number; suppressedCount: number; results: any[] }>('/messages/bulk-send', {
+      method: 'POST',
+      body: JSON.stringify({ recipients, messageTemplate }),
+    }),
 };
 
 // ─── Templates Methods ────────────────────────────────────────────────────────
