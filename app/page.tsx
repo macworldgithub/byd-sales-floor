@@ -48,7 +48,7 @@ export default function SalesFloorApp() {
 
   // Navigation & Role State
   const [activeTab, setActiveTab] = useState<string>('today');
-  const [role, setRole] = useState<'consultant' | 'manager' | 'principal' | 'super_admin'>('consultant');
+  const [role, setRole] = useState<'consultant' | 'manager' | 'principal' | 'super_admin'>('super_admin');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
