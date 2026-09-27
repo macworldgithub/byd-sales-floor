@@ -171,7 +171,7 @@ export default function LoginPage() {
           </button>
 
           {/* Biometric / Face ID Unlock (§3.1) */}
-          <div className="pt-2">
+          {/* <div className="pt-2">
             <button
               type="button"
               onClick={handleBiometricUnlock}
@@ -190,7 +190,7 @@ export default function LoginPage() {
                 </>
               )}
             </button>
-          </div>
+          </div> */}
         </form>
 
         {/* Footer */}
