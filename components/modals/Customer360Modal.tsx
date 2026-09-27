@@ -57,11 +57,12 @@ export function Customer360Modal({
   const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const customerId = lead?._id || String(lead?.id) || '';
+  const rawId = lead?._id || lead?.id;
+  const customerId = (rawId && rawId !== 'undefined') ? String(rawId) : '';
 
   // Fetch real CRM timeline on mount/lead change
   useEffect(() => {
-    if (!customerId) return;
+    if (!customerId || customerId === 'undefined') return;
     let isMounted = true;
     setIsLoadingTimeline(true);
 

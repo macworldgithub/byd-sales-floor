@@ -40,8 +40,8 @@ export function LeadsView({
 }: LeadsViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<string>('All');
-  const [selectedSource, setSelectedSource] = useState<string>('All');
-  const [selectedModel, setSelectedModel] = useState<string>('All');
+  const [selectedSource, setSelectedSource] = useState<string>('All Sources');
+  const [selectedModel, setSelectedModel] = useState<string>('All Models');
   const [selectedScoreBand, setSelectedScoreBand] = useState<string>('All');
   const [selectedRecency, setSelectedRecency] = useState<string>('All');
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
@@ -106,12 +106,12 @@ export function LeadsView({
         let resultList = res.data;
 
         // Apply client-side source and model filters if needed
-        if (selectedSource !== 'All Sources') {
+        if (selectedSource !== 'All Sources' && selectedSource !== 'All') {
           resultList = resultList.filter((l) =>
             (l.source || '').toLowerCase().includes(selectedSource.toLowerCase())
           );
         }
-        if (selectedModel !== 'All Models') {
+        if (selectedModel !== 'All Models' && selectedModel !== 'All') {
           resultList = resultList.filter((l) =>
             (l.vehicle || l.model || '').toUpperCase().includes(selectedModel.toUpperCase())
           );
@@ -132,9 +132,11 @@ export function LeadsView({
         const matchStage = stage === 'All' || l.stage === stage;
         const matchSource =
           selectedSource === 'All Sources' ||
+          selectedSource === 'All' ||
           (l.source || '').toLowerCase().includes(selectedSource.toLowerCase());
         const matchModel =
           selectedModel === 'All Models' ||
+          selectedModel === 'All' ||
           (l.vehicle || l.model || '').toUpperCase().includes(selectedModel.toUpperCase());
         const matchQ =
           !query ||
@@ -163,8 +165,8 @@ export function LeadsView({
       leads.length > 0 &&
       !searchQuery &&
       selectedStage === 'All' &&
-      selectedSource === 'All Sources' &&
-      selectedModel === 'All Models' &&
+      (selectedSource === 'All Sources' || selectedSource === 'All') &&
+      (selectedModel === 'All Models' || selectedModel === 'All') &&
       currentPage === 1
     ) {
       setLeadsList(leads);

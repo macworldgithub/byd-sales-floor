@@ -198,7 +198,7 @@ export function DeliveriesView({
             <span>{totalItems.toLocaleString()} Deliveries Registered</span>
           </div>
           <a
-            href="https://delivery.byd.internal"
+            href="https://deliverycentre.goodshowroom.com"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors"
