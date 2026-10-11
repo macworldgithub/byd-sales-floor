@@ -17,6 +17,7 @@ export interface AuthUser {
   name: string;
   role: 'super_admin' | 'admin' | 'manager' | 'agent' | 'consultant';
   site?: string;
+  locked_site?: string;
 }
 
 interface AuthContextValue {

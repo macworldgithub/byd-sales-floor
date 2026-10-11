@@ -15,6 +15,7 @@ import { PerformanceView } from '@/components/views/PerformanceView';
 import { MoreView } from '@/components/views/MoreView';
 import { SequencesView } from '@/components/views/SequencesView';
 import { TemplateStudioView } from '@/components/views/TemplateStudioView';
+import { StaffView } from '@/components/views/StaffView';
 import { Customer360Modal } from '@/components/modals/Customer360Modal';
 import { BookTestDriveModal } from '@/components/modals/BookTestDriveModal';
 import { AddProspectModal } from '@/components/modals/AddProspectModal';
@@ -575,6 +576,8 @@ export default function SalesFloorApp() {
               {activeTab === 'sequences' && <SequencesView />}
 
               {activeTab === 'templates' && <TemplateStudioView />}
+
+              {activeTab === 'staff' && <StaffView />}
             </motion.div>
           </AnimatePresence>
         </main>

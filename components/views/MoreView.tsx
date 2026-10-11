@@ -13,6 +13,7 @@ import {
   Zap,
   MessageSquare,
   Lock,
+  Users,
 } from 'lucide-react';
 import { ASSET_PATHS } from '@/lib/data';
 
@@ -63,6 +64,12 @@ export function MoreView({
       desc: 'View showroom response velocity, conversion, and SLA tracking',
       icon: Calculator,
       action: () => onNavigateTab('reports'),
+    },
+    {
+      title: 'Showroom Staff Directory',
+      desc: 'View team members, consultants, and managers for your site',
+      icon: Users,
+      action: () => onNavigateTab('staff'),
     },
   ];
 

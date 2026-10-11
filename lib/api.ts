@@ -262,3 +262,46 @@ export const searchApi = {
 export const statsApi = {
   getSummary: () => fetchApi<any>('/stats/summary'),
 };
+
+// ─── Staff API ─────────────────────────────────────────────────────────────────
+
+export interface StaffMember {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+  site?: string;
+  locked_site?: string;
+  position?: string;
+  phone?: string;
+  team?: string;
+  active: boolean;
+  last_login_at?: string;
+  createdAt?: string;
+}
+
+export interface StaffResponse {
+  success: boolean;
+  data: StaffMember[];
+  total: number;
+  userScope: {
+    hasFullAccess: boolean;
+    userSite: string;
+  };
+  availableSites: string[];
+}
+
+export const staffApi = {
+  getStaff: async (site?: string, search?: string) => {
+    const params = new URLSearchParams();
+    if (site && site !== 'All' && site !== 'All Sites' && site !== 'All Locations') {
+      params.set('site', site);
+    }
+    if (search) {
+      params.set('q', search);
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetchApi<any>(`/staff${query}`);
+    return res as unknown as StaffResponse;
+  },
+};

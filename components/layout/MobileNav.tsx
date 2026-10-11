@@ -12,6 +12,7 @@ import {
   MoreHorizontal,
   X,
   MapPin,
+  UserCheck,
 } from 'lucide-react';
 import { ASSET_PATHS } from '@/lib/data';
 
@@ -123,6 +124,7 @@ export function MobileNav({
                   { id: 'leads', label: 'My Leads', icon: Users },
                   { id: 'deliveries', label: 'Deliveries', icon: Car },
                   { id: 'conversations', label: 'Conversations', icon: MessageSquare },
+                  { id: 'staff', label: 'Staff', icon: UserCheck },
                   ...(role === 'manager'
                     ? [
                         { id: 'allocation', label: 'Allocation', icon: GitBranch },

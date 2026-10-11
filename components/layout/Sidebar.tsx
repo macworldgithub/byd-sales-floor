@@ -13,6 +13,7 @@ import {
   Sparkles,
   Zap,
   FileText,
+  UserCheck,
 } from 'lucide-react';
 import { ASSET_PATHS } from '@/lib/data';
 
@@ -42,6 +43,7 @@ export function Sidebar({
       icon: MessageSquare,
       badge: unreadConversationsCount > 0 ? unreadConversationsCount : undefined,
     },
+    { id: 'staff', label: 'Staff', icon: UserCheck },
   ];
 
   const managerNavItems = [
