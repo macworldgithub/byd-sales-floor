@@ -78,7 +78,7 @@ export function BulkMessageModal({
       const recipients = activeLeads.map((l) => ({
         phone: l.phone,
         name: l.name,
-        client_id: l._id || l.id,
+        leadId: l._id,
         body: interpolateTemplate(messageBody, {
           first_name: l.name?.split(' ')[0] || 'there',
           name: l.name,
@@ -104,23 +104,10 @@ export function BulkMessageModal({
         });
         onBroadcastSuccess?.(sent, suppressed);
       } else {
-        // Local fallback calculation
-        const suppressedCount = activeLeads.filter((l) => l.stage === 'Opted Out' || (l as any).opted_out).length;
-        const sentCount = activeLeads.length - suppressedCount;
-        setResultSummary({
-          sent: sentCount,
-          suppressed: suppressedCount,
-          failed: 0,
-        });
-        onBroadcastSuccess?.(sentCount, suppressedCount);
+        setResultSummary({ sent: 0, suppressed: 0, failed: activeLeads.length });
       }
     } catch {
-      setResultSummary({
-        sent: activeLeads.length,
-        suppressed: 0,
-        failed: 0,
-      });
-      onBroadcastSuccess?.(activeLeads.length, 0);
+      setResultSummary({ sent: 0, suppressed: 0, failed: activeLeads.length });
     } finally {
       setIsSending(false);
     }

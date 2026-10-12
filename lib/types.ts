@@ -112,6 +112,9 @@ export interface TeamMember {
 
 export interface ConversationThread {
   _id?: string;
+  leadId?: string;
+  phone?: string;
+  dealer?: string;
   id: number | string;
   prospectName?: string;
   name?: string; // legacy

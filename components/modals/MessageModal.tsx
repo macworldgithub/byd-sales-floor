@@ -11,31 +11,34 @@ import {
   Lock,
   ChevronDown,
 } from 'lucide-react';
-import { Lead } from '@/lib/types';
+import { Lead, ConversationThread } from '@/lib/types';
 import { DEFAULT_TEMPLATE_PACKS, interpolateTemplate } from '@/lib/templateEngine';
 
 interface MessageModalProps {
   isOpen: boolean;
   onClose: () => void;
   lead?: Lead | null;
-  onSendMessage: (message: string, recipientName: string) => void;
+  conversationMessages?: ConversationThread['messages'];
+  onSendMessage: (message: string, recipientName: string) => Promise<boolean>;
 }
 
 export function MessageModal({
   isOpen,
   onClose,
   lead,
+  conversationMessages = [],
   onSendMessage,
 }: MessageModalProps) {
   const [recipient, setRecipient] = useState(lead ? lead.name : 'Customer');
-  const [phone, setPhone] = useState(lead?.phone || '+61 412 890 234');
+  const [phone, setPhone] = useState(lead?.phone || '');
+  const [sending, setSending] = useState(false);
   const [selectedTemplateName, setSelectedTemplateName] = useState('New allocation — first touch');
   const [messageText, setMessageText] = useState('');
 
   useEffect(() => {
     if (lead) {
       setRecipient(lead.name);
-      setPhone(lead.phone || '+61 412 890 234');
+      setPhone(lead.phone || '');
       const initialTmpl = DEFAULT_TEMPLATE_PACKS[0];
       const interpolated = interpolateTemplate(initialTmpl.body, {
         name: lead.name,
@@ -67,10 +70,12 @@ export function MessageModal({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSendMessage(messageText, recipient);
-    onClose();
+    if (sending || !phone || !messageText.trim()) return;
+    setSending(true);
+    try { if (await onSendMessage(messageText, recipient)) onClose(); }
+    finally { setSending(false); }
   };
 
   const segmentCount = Math.ceil((messageText.length || 1) / 160);
@@ -109,6 +114,18 @@ export function MessageModal({
           </div>
         </div>
 
+        <section aria-label="Conversation history" className="max-h-64 overflow-y-auto space-y-2">
+          {conversationMessages.length === 0 && <p className="text-sm text-slate-500">No messages yet.</p>}
+          {conversationMessages.map(m => (
+            <div key={m.sender + ':' + m.id} className={'rounded-lg p-3 text-sm ' + (m.sender === 'user' ? 'bg-slate-100' : 'bg-blue-50')}>
+              <p className="whitespace-pre-wrap">{m.text}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {m.sender === 'user' ? 'Customer' : m.sender === 'ai' ? 'AI Assistant' : m.sender === 'system' ? 'System' : 'Team'}
+                {m.time ? ' · ' + m.time : ''}{m.status ? ' · ' + m.status : ''}
+              </p>
+            </div>
+          ))}
+        </section>
         {/* 10 Standard Template Packs Selector */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
@@ -167,10 +184,11 @@ export function MessageModal({
               </button>
               <button
                 type="submit"
+                disabled={sending || !phone || !messageText.trim()}
                 className="signal-button px-5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-md"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>Send via MobileMessage</span>
+                <span>{sending ? 'Sending…' : 'Send via MobileMessage'}</span>
               </button>
             </div>
           </div>

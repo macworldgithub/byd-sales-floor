@@ -63,7 +63,7 @@ export default function SalesFloorApp() {
   // Data State
   const [leads, setLeads] = useState<Lead[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
-  const [threads, setThreads] = useState<ConversationThread[]>(CONVERSATION_THREADS);
+  const [threads, setThreads] = useState<ConversationThread[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>(TODAY_TIMELINE_EVENTS);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -125,7 +125,7 @@ export default function SalesFloorApp() {
           setDeliveries(INITIAL_DELIVERIES as any);
         }
 
-        if (threadsRes.success && threadsRes.data && threadsRes.data.length > 0) {
+        if (threadsRes.success && threadsRes.data) {
           setThreads(threadsRes.data);
         }
 
@@ -147,6 +147,24 @@ export default function SalesFloorApp() {
     };
 
     fetchData();
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let active = true;
+    let pending = false;
+    const refresh = async () => {
+      if (pending || document.visibilityState !== 'visible') return;
+      pending = true;
+      try {
+        const res = await conversationApi.getConversations();
+        if (active && res.success && res.data) setThreads(res.data);
+      } catch (err) { console.error('Message refresh failed:', err); }
+      finally { pending = false; }
+    };
+    const timer = window.setInterval(refresh, 5000);
+    window.addEventListener('focus', refresh);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
   }, [isAuthenticated]);
 
   // Network State & Offline Queue Listener (§3.1, §8.2, §10 AC #9)
@@ -203,7 +221,11 @@ export default function SalesFloorApp() {
         ('name' in lead && lead.name) ||
         ('prospectName' in lead && (lead as ConversationThread).prospectName) ||
         '';
-      const found = leads.find((l) => l.name === threadOrLeadName);
+      const thread = lead as ConversationThread;
+      const normalizedPhone = (value?: string) => (value || '').replace(/\D/g, '').replace(/^0/, '61');
+      const found = leads.find(l => thread.leadId && l._id === thread.leadId)
+        || leads.find(l => thread.phone && normalizedPhone(l.phone) === normalizedPhone(thread.phone))
+        || (!thread.phone ? leads.find(l => l.name === threadOrLeadName) : undefined);
       if (found) {
         setMessageLead(found);
       } else {
@@ -218,7 +240,9 @@ export default function SalesFloorApp() {
           source: 'Chat',
           lastTouch: 'Just now',
           action: 'Message',
-          phone: '+61 412 890 234',
+          phone: thread.phone || '',
+          _id: thread.leadId,
+          dealer: thread.dealer,
         });
       }
     } else {
@@ -310,45 +334,27 @@ export default function SalesFloorApp() {
     }
   };
 
-  const handleSendMessage = async (message: string, recipientName: string) => {
-    // Optimistic UI thread update
-    setThreads((prev) => [
-      {
-        id: Date.now(),
-        name: recipientName,
-        initials: recipientName
-          .split(' ')
-          .map((n) => n[0])
-          .join('')
-          .substring(0, 2)
-          .toUpperCase(),
-        lastMessage: message,
-        time: 'Just now',
-        model: messageLead?.model || messageLead?.vehicle || 'BYD Range',
-      },
-      ...prev.filter((t) => t.name !== recipientName),
-    ]);
-
+  const handleSendMessage = async (message: string, recipientName: string): Promise<boolean> => {
+    if (!messageLead?.phone || !message.trim()) {
+      addToast('error', 'SMS not sent', 'Choose a customer with a mobile number.');
+      return false;
+    }
     try {
       const res = await messageApi.sendMessage({
-        phone: messageLead?.phone || '+61412890234',
-        body: message,
+        phone: messageLead.phone,
+        body: message.trim(),
         client_name: recipientName,
-        client_id: messageLead?._id,
+        leadId: messageLead._id,
+        site: messageLead.dealer || messageLead.dealerName,
       });
-
-      const isSim = (res as any)?.simulated;
-      addToast(
-        'success',
-        isSim ? 'SMS Outreach Dispatched (Simulation)' : 'SMS Outreach Dispatched',
-        `Message sent to ${recipientName} via MobileMessage Gateway.`
-      );
+      if (!res.success) throw new Error(res.message || 'SMS dispatch failed');
+      const threads = await conversationApi.getConversations().catch(() => null);
+      if (threads?.success && threads.data) setThreads(threads.data);
+      addToast('success', (res as any).simulated ? 'SMS simulated' : 'SMS sent', `Message sent to ${recipientName}.`);
+      return true;
     } catch (err: any) {
-      addToast(
-        'error',
-        'SMS Outreach Failed',
-        err.message || `Failed to dispatch message to ${recipientName}.`
-      );
+      addToast('error', 'SMS failed', err.message || 'The message could not be sent.');
+      return false;
     }
   };
 
@@ -626,6 +632,7 @@ export default function SalesFloorApp() {
         isOpen={isMessageOpen}
         onClose={() => setIsMessageOpen(false)}
         lead={messageLead}
+        conversationMessages={threads.find(t => t.phone && t.phone.replace(/\D/g, '').replace(/^0/, '61') === (messageLead?.phone || '').replace(/\D/g, '').replace(/^0/, '61'))?.messages || []}
         onSendMessage={handleSendMessage}
       />
 

@@ -68,7 +68,7 @@ export async function fetchApi<T>(
 
   const json = await response.json();
   if (!response.ok) {
-    throw new Error(json.message || `API Error: ${response.status}`);
+    throw new Error(json.message || json.error || `API Error: ${response.status}`);
   }
   return json;
 }
@@ -84,7 +84,7 @@ export const authApi = {
     });
     const json = await response.json();
     if (!response.ok) {
-      throw new Error(json.message || 'Login failed');
+      throw new Error(json.message || json.error || 'Login failed');
     }
     return json as { success: boolean; data: { access_token: string; user: any; must_change_password: boolean } };
   },
@@ -208,9 +208,16 @@ export const inventoryApi = {
 // ─── Conversations & Messaging Methods ─────────────────────────────────────────
 
 export const conversationApi = {
-  getConversations: (params?: Record<string, string>) => {
+  getConversations: async (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-    return fetchApi<ConversationThread[]>(`/conversations${qs}`);
+    const result = await fetchApi<any[]>(`/conversations${qs}`);
+    return { ...result, data: result.data?.map(thread => ({
+      ...thread,
+      id: thread._id || thread.id,
+      name: thread.prospectName || thread.name || thread.phone,
+      time: thread.lastMessageAt ? new Date(thread.lastMessageAt).toLocaleString('en-AU') : '',
+      initials: thread.initials || (thread.prospectName || '').split(' ').map((part: string) => part[0]).join('').slice(0, 2),
+    })) as ConversationThread[] | undefined };
   },
   getConversation: (id: string) => fetchApi<ConversationThread>(`/conversations/${id}`),
   sendMessage: (id: string, text: string) =>
@@ -222,6 +229,8 @@ export const messageApi = {
     phone: string;
     body: string;
     client_id?: string;
+    leadId?: string;
+    site?: string;
     client_name?: string;
     template_id?: string;
   }) => fetchApi('/messages/send', { method: 'POST', body: JSON.stringify(data) }),
