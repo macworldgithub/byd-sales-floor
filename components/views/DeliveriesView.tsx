@@ -257,6 +257,8 @@ export function DeliveriesView({
                 onClick={() =>
                   onOpenMessage({
                     id: featured._id || featured.id,
+                    client_id: String(featured.id || featured._id || '') || undefined,
+                    dealer: featured.site_location || featured.site,
                     name: featured.name,
                     initials: 'PN',
                     model: featured.vehicle,
@@ -265,7 +267,7 @@ export function DeliveriesView({
                     source: 'Showroom',
                     lastTouch: 'Today',
                     action: 'Message',
-                    phone: featured.phone || '+61 401 552 901',
+                    phone: featured.phone || '',
                   })
                 }
                 className="signal-button px-4 py-2 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 shadow-lg"

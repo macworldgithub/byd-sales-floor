@@ -42,6 +42,7 @@ import {
   INITIAL_DELIVERIES,
 } from '@/lib/data';
 import { Lead, Delivery, TimelineEvent, ConversationThread } from '@/lib/types';
+import { messageRecipient } from '@/lib/messageRecipient';
 
 export default function SalesFloorApp() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -214,40 +215,7 @@ export default function SalesFloorApp() {
   };
 
   const handleOpenMessage = (lead?: Lead | ConversationThread) => {
-    if (lead && 'stage' in lead && (lead as Lead).stage) {
-      setMessageLead(lead as Lead);
-    } else if (lead) {
-      const threadOrLeadName =
-        ('name' in lead && lead.name) ||
-        ('prospectName' in lead && (lead as ConversationThread).prospectName) ||
-        '';
-      const thread = lead as ConversationThread;
-      const normalizedPhone = (value?: string) => (value || '').replace(/\D/g, '').replace(/^0/, '61');
-      const found = leads.find(l => thread.leadId && l._id === thread.leadId)
-        || leads.find(l => thread.phone && normalizedPhone(l.phone) === normalizedPhone(thread.phone))
-        || (!thread.phone ? leads.find(l => l.name === threadOrLeadName) : undefined);
-      if (found) {
-        setMessageLead(found);
-      } else {
-        setMessageLead({
-          id: lead.id,
-          name: threadOrLeadName || 'Customer',
-          initials: lead.initials || 'CU',
-          model: lead.model || 'SEALION 7',
-          vehicle: lead.model || 'SEALION 7',
-          score: 70,
-          stage: 'Engaged',
-          source: 'Chat',
-          lastTouch: 'Just now',
-          action: 'Message',
-          phone: thread.phone || '',
-          _id: thread.leadId,
-          dealer: thread.dealer,
-        });
-      }
-    } else {
-      setMessageLead(leads[0] || null);
-    }
+    setMessageLead(lead ? messageRecipient(lead, leads) : leads[0] || null);
     setIsMessageOpen(true);
   };
 
@@ -344,7 +312,8 @@ export default function SalesFloorApp() {
         phone: messageLead.phone,
         body: message.trim(),
         client_name: recipientName,
-        leadId: messageLead._id,
+        leadId: messageLead.client_id ? undefined : messageLead._id,
+        client_id: messageLead.client_id,
         site: messageLead.dealer || messageLead.dealerName,
       });
       if (!res.success) throw new Error(res.message || 'SMS dispatch failed');

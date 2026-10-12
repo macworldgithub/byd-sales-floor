@@ -1,5 +1,6 @@
 export interface Lead {
   _id?: string;
+  client_id?: string;
   id?: number | string; // legacy support
   name: string;
   initials?: string;
@@ -40,6 +41,8 @@ export interface Lead {
 
 export interface Delivery {
   _id?: string;
+  site?: string;
+  site_location?: string;
   id?: number | string; // legacy support
   name: string;
   vehicle?: string;
@@ -113,6 +116,7 @@ export interface TeamMember {
 export interface ConversationThread {
   _id?: string;
   leadId?: string;
+  client_id?: string;
   phone?: string;
   dealer?: string;
   id: number | string;
