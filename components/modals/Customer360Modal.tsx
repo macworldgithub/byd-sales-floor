@@ -179,7 +179,7 @@ export function Customer360Modal({
     {
       date: '3 Sep 2026',
       time: '11:15 AM',
-      title: 'AI Qualification Intent',
+      title: 'Qualification Summary',
       detail: `Score reached ${lead.score || 75} points via online brochure & finance inquiry.`,
       source: 'Conversion Engine',
       badge: `Score: ${lead.score || 75}`,

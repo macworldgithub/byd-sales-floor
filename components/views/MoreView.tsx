@@ -30,8 +30,8 @@ export function MoreView({
 }: MoreViewProps) {
   const tools = [
     {
-      title: 'Automated Sequences',
-      desc: 'Autogate 15m SLA, Walk-in nurture and No-Show cadences',
+      title: 'Manual SMS Follow-up',
+      desc: 'Staff-managed customer messages and follow-up',
       icon: Zap,
       action: () => onNavigateTab('sequences'),
     },
@@ -78,9 +78,9 @@ export function MoreView({
       <div className="page-intro">
         <div>
           <p className="eyebrow">Sales Floor OS · Extended Operations</p>
-          <h1 className="page-title">FLOOR TOOLS & AUTOMATIONS</h1>
+          <h1 className="page-title">FLOOR TOOLS</h1>
           <p className="page-subtitle">
-            Sequences engine, template studio, inventory soft-holds, and consultant allocation for Melbourne CBD.
+            Manual follow-up, message templates, inventory soft-holds, and consultant allocation.
           </p>
         </div>
       </div>
