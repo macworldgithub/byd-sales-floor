@@ -1,17 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  GitBranch,
-  AlertTriangle,
-  CheckCircle2,
-  Users,
-  ArrowRight,
-  ShieldAlert,
-  Zap,
-} from 'lucide-react';
-import { Lead, ConsultantCapacity } from '@/lib/types';
-import { CONSULTANT_CAPACITIES } from '@/lib/data';
+import React, { useState, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import { Lead } from '@/lib/types';
+import { staffApi, StaffMember } from '@/lib/api';
 import { Pagination } from '@/components/ui/Pagination';
 
 interface AllocationViewProps {
@@ -25,6 +17,23 @@ export function AllocationView({
 }: AllocationViewProps) {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 4;
+  const [selectedSite, setSelectedSite] = useState('All Sites');
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [availableSites, setAvailableSites] = useState<string[]>([]);
+  const [staffError, setStaffError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    setStaff([]);
+    setStaffError('');
+    staffApi.getStaff(selectedSite).then(res => {
+      if (!cancelled) {
+        setStaff(res.data);
+        setAvailableSites(res.userScope.hasFullAccess ? res.availableSites : [res.userScope.userSite]);
+        if (!res.userScope.hasFullAccess) setSelectedSite(res.userScope.userSite);
+      }
+    }).catch(() => { if (!cancelled) setStaffError('Unable to load site staff. Please try again.'); });
+    return () => { cancelled = true; };
+  }, [selectedSite]);
 
   const totalPages = Math.ceil(unassignedLeads.length / pageSize);
   const paginatedUnassigned = unassignedLeads.slice(
@@ -58,9 +67,9 @@ export function AllocationView({
       <div className="page-intro">
         <div>
           <p className="eyebrow">Manager Console</p>
-          <h1 className="page-title">LEAD ALLOCATION · CAPACITY ENGINE</h1>
+          <h1 className="page-title">LEAD ALLOCATION</h1>
           <p className="page-subtitle">
-            Balance incoming Carsales, Web and Walk-in enquiries dynamically. Drag leads onto available consultants or use 1-tap quick assignment.
+            Assign incoming Carsales, Web and Walk-in enquiries to staff at the selected site.
           </p>
         </div>
 
@@ -71,6 +80,14 @@ export function AllocationView({
       </div>
 
       {/* Allocation Grid */}
+      <label className="text-sm font-semibold">
+        Staff site
+        <select value={selectedSite} onChange={e => setSelectedSite(e.target.value)} className="ml-3 rounded-lg border p-2">
+          <option value="All Sites">All accessible sites</option>
+          {availableSites.map(site => <option key={site} value={site}>{site}</option>)}
+        </select>
+      </label>
+      {staffError && <p role="alert" className="text-sm text-red-700">{staffError}</p>}
       <div className="allocation-grid">
         {/* Left Column: Unassigned Inbound Queue */}
         <div className="surface-card overflow-hidden flex flex-col justify-between">
@@ -137,20 +154,13 @@ export function AllocationView({
                           Assign to available consultant:
                         </p>
                         <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => onAssignLead(leadId, 'Lena Park')}
-                            className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
-                          >
-                            <span>Lena Park (46%)</span>
-                            <ArrowRight className="w-3 h-3 text-slate-400" />
-                          </button>
-                          <button
-                            onClick={() => onAssignLead(leadId, 'Alex Morgan')}
-                            className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-400 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors shadow-xs"
-                          >
-                            <span>Alex Morgan (72%)</span>
-                            <ArrowRight className="w-3 h-3 text-slate-400" />
-                          </button>
+                          <select defaultValue="" onChange={e => {
+                            if (e.target.value) onAssignLead(leadId, e.target.value);
+                            e.target.value = '';
+                          }} className="col-span-2 p-2 rounded-lg border text-xs">
+                            <option value="">Select staff member</option>
+                            {staff.map(member => <option key={member.email} value={member.name}>{member.name}</option>)}
+                          </select>
                         </div>
                       </div>
                     </div>
@@ -177,7 +187,7 @@ export function AllocationView({
             <div className="card-header-row !p-0 !pb-4">
               <div>
                 <p className="eyebrow">Floor Load Distribution</p>
-                <h2 className="section-title">Sales Consultant Capacity</h2>
+                <h2 className="section-title">Staff Available for Assignment</h2>
               </div>
               <span className="text-xs font-semibold text-slate-500 font-mono">
                 DRAG & DROP READY
@@ -185,20 +195,12 @@ export function AllocationView({
             </div>
 
             <div className="space-y-4">
-              {CONSULTANT_CAPACITIES.map((c) => {
-                const isHigh = c.capacityPct > 80;
-                const isOptimal = c.capacityPct >= 60 && c.capacityPct <= 80;
-                const barColor = isHigh
-                  ? 'bg-[#e60012]'
-                  : isOptimal
-                  ? 'bg-slate-900'
-                  : 'bg-emerald-500';
-
+              {staff.map((c) => {
                 const isDragOver = activeDropConsultant === c.name;
 
                 return (
                   <div
-                    key={c.id}
+                    key={c.email}
                     onDragOver={(e) => {
                       e.preventDefault();
                       setActiveDropConsultant(c.name);
@@ -216,16 +218,13 @@ export function AllocationView({
                   >
                     <div className="flex items-center gap-3">
                       <div className="avatar-initials bg-slate-900 text-white font-bold">
-                        {c.initials}
+                        {c.name.split(' ').map(part => part[0]).slice(0, 2).join('')}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <strong className="text-sm font-semibold text-slate-900">{c.name}</strong>
-                          <span className="text-[10px] font-bold text-slate-400 font-mono">
-                            {c.leadsCount} ACTIVE LEADS
-                          </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">{c.status}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{c.position || c.role} · {c.site}</p>
                       </div>
                       {isDragOver && (
                         <span className="text-[11px] font-bold text-[#e60012] font-mono animate-bounce">
@@ -234,25 +233,6 @@ export function AllocationView({
                       )}
                     </div>
 
-                    <div className="capacity-block">
-                      <div className="flex items-center justify-between text-xs font-semibold mb-1">
-                        <span className="text-slate-500">Floor Load</span>
-                        <span className="font-mono text-slate-900">{c.capacityPct}%</span>
-                      </div>
-                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                        <div
-                          className={`h-full ${barColor} rounded-full transition-all duration-500`}
-                          style={{ width: `${c.capacityPct}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {c.warning && (
-                      <div className="capacity-warning">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>{c.warning}</span>
-                      </div>
-                    )}
                   </div>
                 );
               })}
