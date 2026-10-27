@@ -38,7 +38,7 @@ export function Header({
   unreadNotifications = true,
   isOnline = true,
 }: HeaderProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, activeSite, setActiveSite } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<{
     leads: Lead[];
@@ -103,6 +103,9 @@ export function Header({
             {user ? `Good morning, ${user.name.split(' ')[0]}` : 'Manager Console'}
           </h2>
         </div>
+        {user?.allowed_sites && !user.all_sites && <select aria-label="Active site" className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs max-w-48" value={activeSite} onChange={event => { setActiveSite(event.target.value); window.location.reload(); }}>
+          {user.allowed_sites.map(site => <option key={site}>{site}</option>)}
+        </select>}
       </div>
 
       {/* Center Global Search Bar (§5.11) */}

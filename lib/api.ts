@@ -51,6 +51,10 @@ export async function fetchApi<T>(
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
+  if (typeof window !== 'undefined' && !endpoint.startsWith('/auth/')) {
+    const site = localStorage.getItem('byd_floor_site');
+    if (site) headers.set('X-Site', site);
+  }
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,
@@ -80,7 +84,7 @@ export const authApi = {
     const response = await fetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, platform: 'sales_floor' }),
     });
     const json = await response.json();
     if (!response.ok) {

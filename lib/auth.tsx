@@ -18,6 +18,8 @@ export interface AuthUser {
   role: 'super_admin' | 'admin' | 'manager' | 'agent' | 'consultant';
   site?: string;
   locked_site?: string;
+  allowed_sites?: string[];
+  all_sites?: boolean;
 }
 
 interface AuthContextValue {
@@ -26,6 +28,8 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  activeSite: string;
+  setActiveSite: (site: string) => void;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -37,6 +41,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser]       = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [savedSite, setSavedSite] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('byd_floor_site') || '' : '');
+  const assignedSites = user?.allowed_sites && !user.all_sites ? user.allowed_sites : null;
+  const activeSite = assignedSites ? (assignedSites.includes(savedSite) ? savedSite : user?.site || assignedSites[0]) : user?.locked_site || '';
+  const setActiveSite = (site: string) => {
+    if (assignedSites && !assignedSites.includes(site)) return;
+    setSavedSite(site); localStorage.setItem('byd_floor_site', site);
+  };
 
   // On mount, try to rehydrate session from stored token
   useEffect(() => {
@@ -68,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!res.success) throw new Error('Login failed');
     setToken(res.data.access_token);
     setUser(res.data.user);
+    if (res.data.user.allowed_sites && !res.data.user.all_sites) setActiveSite(res.data.user.site || res.data.user.allowed_sites[0]);
   }, []);
 
   const logout = useCallback(async () => {
@@ -78,6 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value: AuthContextValue = {
+    activeSite,
+    setActiveSite,
     user,
     isAuthenticated: !!user,
     isLoading,

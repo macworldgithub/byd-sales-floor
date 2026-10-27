@@ -131,13 +131,19 @@ export default function SalesFloorApp() {
         }
 
         if (apptsRes.success && apptsRes.data && apptsRes.data.length > 0) {
-          const mappedAppts: TimelineEvent[] = apptsRes.data.map((a: any) => ({
-            time: (a.when && a.when.includes('T')) ? a.when.split('T')[1].substring(0, 5) : '10:00',
-            end: '11:00',
-            title: `${a.type || 'Appointment'} · ${a.prospectName}`,
-            detail: `${a.vehicle || 'BYD Range'} · ${a.notes || 'Melbourne CBD Loop'}`,
-            type: (a.type === 'Test Drive' ? 'drive' : 'followup') as TimelineEvent['type'],
-          }));
+          const mappedAppts: TimelineEvent[] = apptsRes.data.map((a: any) => {
+            const start = new Date(a.testDriveDate || a.when);
+            const formatTime = (date: Date) => Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString('en-AU', {
+              timeZone: 'Australia/Melbourne', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+            });
+            return {
+              time: formatTime(start),
+              end: formatTime(new Date(start.getTime() + (a.durationMinutes || 45) * 60000)),
+              title: `${a.type || 'Appointment'} · ${a.prospectName}`,
+              detail: `${a.vehicle || 'BYD Range'} · ${a.notes || 'Melbourne CBD Loop'}`,
+              type: (a.type === 'Test Drive' ? 'drive' : 'followup') as TimelineEvent['type'],
+            };
+          });
           setTimelineEvents((prev) => [...mappedAppts, ...prev.slice(0, 3)]);
         }
       } catch (err) {
