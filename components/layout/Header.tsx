@@ -99,9 +99,9 @@ export function Header({
         </button>
 
         <div>
-          <p className="topbar-kicker">BYD Melbourne CBD · Floor OS</p>
+          <p className="topbar-kicker">{activeSite || user?.site || 'Sales Floor'} · Floor OS</p>
           <h2 className="text-base font-semibold text-slate-900 tracking-tight">
-            {user ? `Good morning, ${user.name.split(' ')[0]}` : 'Manager Console'}
+            {user ? `Welcome, ${user.name.split(' ')[0]}` : 'Sales Floor'}
           </h2>
         </div>
         {user?.allowed_sites && !user.all_sites && !isFloorAdmin(user.role) && <select aria-label="Active site" className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs max-w-48" value={activeSite} onChange={event => { setActiveSite(event.target.value); window.location.reload(); }}>

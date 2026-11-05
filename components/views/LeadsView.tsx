@@ -181,7 +181,7 @@ export function LeadsView({
           <p className="eyebrow">Prospect Pipeline · Floor CRM Operating System</p>
           <h1 className="page-title">LEAD CENTRE · LIVE BOOK</h1>
           <p className="page-subtitle">
-            Real-time incoming enquiries, qualification stages, and intent scoring across Melbourne CBD inventory.
+            {activeSite || user?.site || 'Sales Floor'} · Live enquiries, qualification stages and intent scores.
           </p>
         </div>
 
