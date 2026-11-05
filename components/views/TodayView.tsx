@@ -1,6 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '@/lib/auth';
+import { normalizeLead, toTimeline, type FloorToday } from '@/lib/floorCalendar';
+import { floorApi } from '@/lib/api';
+import { Pagination } from '@/components/ui/Pagination';
 import Image from 'next/image';
 import {
   AlertTriangle,
@@ -19,15 +23,13 @@ import {
   X,
   Send,
 } from 'lucide-react';
-import { Lead, TimelineEvent, Delivery } from '@/lib/types';
+import { Lead, TimelineEvent } from '@/lib/types';
 import { ASSET_PATHS } from '@/lib/data';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { crmApi } from '@/lib/api';
 
 interface TodayViewProps {
-  leads: Lead[];
-  timelineEvents: TimelineEvent[];
-  deliveries?: Delivery[];
+  refreshKey?: number;
   onSelectLead: (lead: Lead) => void;
   onOpenBookDrive: (lead?: Lead) => void;
   onOpenAddProspect: () => void;
@@ -36,15 +38,42 @@ interface TodayViewProps {
 }
 
 export function TodayView({
-  leads,
-  timelineEvents,
-  deliveries = [],
+  refreshKey = 0,
   onSelectLead,
   onOpenBookDrive,
   onOpenAddProspect,
   onOpenMessage,
   onNavigateTab,
 }: TodayViewProps) {
+  const { user, activeSite } = useAuth();
+  const [data, setData] = useState<FloorToday | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const request = useRef(0);
+  const load = useCallback(async () => {
+    const sequence = ++request.current;
+    setLoading(true); setError('');
+    try {
+      const result = await floorApi.today(page);
+      if (sequence !== request.current) return;
+      if (!result.success || !result.data) throw new Error(result.message || 'Unable to load Today');
+      setData(result.data);
+      if (result.data.eventPagination.page !== page) setPage(result.data.eventPagination.page);
+    } catch (error: any) { if (sequence === request.current) { setData(null); setError(error.message); } }
+    finally { if (sequence === request.current) setLoading(false); }
+  }, [page, activeSite, user?.id, refreshKey]);
+  useEffect(() => {
+    setData(null); load();
+    const refresh = () => { if (document.visibilityState === 'visible') load(); };
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    return () => { request.current++; clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [load]);
+  const leads = (data?.leads || []).map(normalizeLead);
+  const timelineEvents = (data?.events || []).map(toTimeline);
+  const nextDelivery = data?.nextDelivery;
+
   // Quick Log Call modal state
   const [isLogCallOpen, setIsLogCallOpen] = useState(false);
   const [callLead, setCallLead] = useState<Lead | null>(leads[0] || null);
@@ -85,14 +114,15 @@ export function TodayView({
   };
 
   // Dynamic next appointment calculation
-  const nextEvent = timelineEvents[0];
-  const nextLead = leads.find((l) => nextEvent && nextEvent.title.includes(l.name)) || leads[0];
+  const upcoming = data?.nextEvent;
+  const nextEvent = upcoming ? toTimeline(upcoming) : null;
+  const nextLead = leads.find(lead => upcoming && String(lead._id || lead.id) === upcoming.customer_id);
 
   // Dynamic metrics calculation
-  const needsMeCount = leads.filter((l) => l.priority || (l.score ?? 0) >= 80 || l.stage === 'Imported').length || 4;
-  const todayAppointmentsCount = timelineEvents.length || 6;
-  const conversationPulseCount = leads.length + 8;
-  const deliveriesCount = deliveries.length || 5;
+  const needsMeCount = data?.stats.needsMe ?? 0;
+  const todayAppointmentsCount = data?.stats.appointmentsToday ?? 0;
+  const conversationPulseCount = data?.stats.conversationPulse ?? 0;
+  const deliveriesCount = data?.stats.deliveriesThisWeek ?? 0;
 
   const handleSaveCall = async () => {
     if (!callLead) return;
@@ -102,7 +132,7 @@ export function TodayView({
         direction: callDirection,
         outcome: callOutcome,
         notes: callNotes,
-        consultantName: 'Alex Rivers',
+        consultantName: user?.name || user?.email,
       });
       setCallFeedback('Call logged into Unified CRM Timeline & Activity Log.');
       setTimeout(() => {
@@ -110,13 +140,8 @@ export function TodayView({
         setCallNotes('');
         setCallFeedback(null);
       }, 1200);
-    } catch {
-      setCallFeedback('Call saved to local session history.');
-      setTimeout(() => {
-        setIsLogCallOpen(false);
-        setCallNotes('');
-        setCallFeedback(null);
-      }, 1200);
+    } catch (error: any) {
+      setCallFeedback(error.message || 'Call could not be saved. Please try again.');
     } finally {
       setIsSubmittingCall(false);
     }
@@ -124,22 +149,24 @@ export function TodayView({
 
   return (
     <div className="view-stack">
+      {error && <div role="alert" className="p-3 rounded-lg bg-red-50 text-red-700">{error}</div>}
+      {loading && <p role="status">Refreshing live floor data…</p>}
       {/* Hero Panel */}
       <section className="hero-panel">
         <img
           src={ASSET_PATHS.hero}
-          alt="BYD Melbourne CBD Showroom Floor"
+          alt="Showroom floor"
           className="w-full h-full object-cover"
         />
         <div className="hero-shade" />
 
         <div className="hero-content">
-          <p className="eyebrow text-slate-300">MELBOURNE CBD · MON 8 SEP</p>
+          <p className="eyebrow text-slate-300">{data?.site || activeSite || 'Sales Floor'} · {data?.date || ''}</p>
           <h1>
             YOUR FLOOR, <span className="text-[#ff6c5e]">IN MOTION.</span>
           </h1>
           <p className="text-sm md:text-base text-slate-300 mt-2 max-w-lg leading-relaxed">
-            {needsMeCount} high-intent prospects approaching SLA. Delivery bay 2 is staged for 10:30 pickup.
+            {needsMeCount} prospects need attention. {todayAppointmentsCount} appointments are scheduled today.
           </p>
 
           <div className="flex flex-wrap items-center gap-3 mt-6">
@@ -178,17 +205,17 @@ export function TodayView({
               Next Up · In 38 min
             </span>
             <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider font-mono">
-              {nextEvent ? nextEvent.time : '09:00 AM'}
+              {nextEvent?.time || '—'}
             </span>
           </div>
 
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <strong className="text-white text-sm font-semibold block truncate">
-                {nextLead ? nextLead.name : 'Sarah Mitchell'}
+                {upcoming?.customer_name || 'No upcoming appointment'}
               </strong>
               <p className="text-xs text-slate-300 truncate">
-                {nextEvent ? nextEvent.detail : 'Test drive · SEALION 7 Premium · Demo Loop B'}
+                {nextEvent?.detail || 'Open Calendar to view the full schedule.'}
               </p>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
@@ -202,7 +229,7 @@ export function TodayView({
                 </a>
               )}
               <button
-                onClick={() => nextLead && onSelectLead(nextLead)}
+                onClick={() => nextLead ? onSelectLead(nextLead) : onNavigateTab('calendar')}
                 className="round-action hover:scale-105 transition-transform"
                 aria-label="View appointment details"
               >
@@ -218,14 +245,14 @@ export function TodayView({
         <MetricCard
           label="Needs me"
           value={String(needsMeCount)}
-          change="Approaching 15m SLA"
+          change="High-intent and new enquiries"
           icon={AlertTriangle}
           tone="red"
         />
         <MetricCard
           label="Today's appointments"
           value={String(todayAppointmentsCount)}
-          change="Test drives & handovers"
+          change="Live scheduled appointments"
           icon={Calendar}
           tone="cyan"
         />
@@ -239,7 +266,7 @@ export function TodayView({
         <MetricCard
           label="7-day deliveries"
           value={String(deliveriesCount)}
-          change="Delivery Centre staged"
+          change="Scheduled in the next seven days"
           icon={Car}
           tone="green"
         />
@@ -258,12 +285,13 @@ export function TodayView({
               onClick={() => onNavigateTab('leads')}
               className="text-link"
             >
-              <span>View live book ({leads.length})</span>
+              <span>View live book ({data?.stats.totalLeads ?? 0})</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
           <div className="divide-y divide-slate-100">
+            {!leads.length && !loading && <p className="p-4 text-slate-500 text-sm">No leads currently need attention.</p>}
             {leads.slice(0, 5).map((lead) => (
               <div
                 key={lead.id}
@@ -309,7 +337,7 @@ export function TodayView({
                     }}
                     className="status-chip hover:border-slate-400 transition-colors"
                   >
-                    <span>{lead.action}</span>
+                    <span>{lead.action || 'Open lead'}</span>
                     <ArrowRight className="w-3 h-3" />
                   </button>
                 </div>
@@ -349,7 +377,9 @@ export function TodayView({
                   </div>
                 </div>
               ))}
+              {!timelineEvents.length && <p className="text-sm text-slate-500">No events scheduled for today.</p>}
             </div>
+            {data && <Pagination currentPage={data.eventPagination.page} totalPages={data.eventPagination.pages} totalItems={data.eventPagination.total} pageSize={data.eventPagination.limit} onPageChange={setPage} itemName="events" isLoading={loading} />}
           </div>
 
           {/* Delivery Spotlight Tile */}
@@ -364,13 +394,13 @@ export function TodayView({
             />
             <div className="delivery-overlay">
               <span className="stage-pill bg-emerald-500 text-white w-fit mb-1.5 shadow-sm">
-                Ready for Handover
+                {nextDelivery?.status || 'Upcoming deliveries'}
               </span>
               <h3 className="font-condensed text-xl font-semibold text-white">
-                Priya Nair · ATTO 3 Extended
+                {nextDelivery ? `${nextDelivery.customer_name} · ${nextDelivery.vehicle}` : 'No deliveries scheduled in the next seven days'}
               </h3>
               <p className="text-xs text-slate-300 mt-0.5">
-                Delivery bay 2 · Today at 10:30 AM · Handover lead: Sophie Tran
+                {nextDelivery ? [nextDelivery.dateStr, nextDelivery.timeStr, nextDelivery.consultant, nextDelivery.site].filter(Boolean).join(' · ') : 'Delivery appointments appear here when scheduled.'}
               </p>
             </div>
           </div>
@@ -476,7 +506,7 @@ export function TodayView({
               <button
                 type="button"
                 onClick={handleSaveCall}
-                disabled={isSubmittingCall}
+                disabled={isSubmittingCall || !callLead}
                 className="px-5 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white flex items-center gap-1.5"
               >
                 {isSubmittingCall ? (

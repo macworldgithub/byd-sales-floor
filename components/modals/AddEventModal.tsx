@@ -1,38 +1,53 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Calendar, Clock, Plus, CheckCircle2 } from 'lucide-react';
 import { TimelineEvent } from '@/lib/types';
+import { melbourneDay } from '@/lib/floorCalendar';
 
 interface AddEventModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddEvent: (evt: TimelineEvent) => void;
+  onAddEvent: (evt: TimelineEvent) => Promise<void>;
+  initialDate?: string;
 }
 
 export function AddEventModal({
   isOpen,
   onClose,
   onAddEvent,
+  initialDate,
 }: AddEventModalProps) {
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
-  const [type, setType] = useState<TimelineEvent['type']>('drive');
+  const [type, setType] = useState<TimelineEvent['type']>('followup');
+  const [date, setDate] = useState(initialDate || melbourneDay());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const requestId = useRef('');
   const [time, setTime] = useState('11:00');
   const [end, setEnd] = useState('11:45');
+  useEffect(() => {
+    if (isOpen) { setDate(initialDate || melbourneDay()); setError(''); requestId.current = crypto.randomUUID(); }
+  }, [isOpen, initialDate]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAddEvent({
+    if (saving) return;
+    setSaving(true); setError('');
+    try { await onAddEvent({
+      bookingRequestId: requestId.current,
+      date,
       title: title || 'New Appointment',
-      detail: detail || 'Melbourne CBD Showroom Floor',
+      detail,
       type,
       time,
       end,
     });
-    onClose();
+    onClose(); } catch (error: any) { setError(error.message || 'Event could not be saved.'); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -55,6 +70,8 @@ export function AddEventModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && <p role="alert" className="text-red-700">{error}</p>}
+          <label className="block text-sm">Date<input aria-label="Event date" required type="date" className="block border rounded-lg p-2" value={date} onChange={event => setDate(event.target.value)} /></label>
           <div>
             <label className="text-[11px] font-bold text-slate-500 uppercase font-mono block mb-1">
               Event Title
@@ -79,7 +96,6 @@ export function AddEventModal({
                 onChange={(e) => setType(e.target.value as TimelineEvent['type'])}
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm text-slate-900 bg-slate-50 outline-none"
               >
-                <option value="drive">Test Drive</option>
                 <option value="delivery">Handover / Delivery</option>
                 <option value="followup">Customer Follow-up</option>
                 <option value="hold">Personal Hold / Duty</option>
@@ -92,7 +108,7 @@ export function AddEventModal({
                   Start Time
                 </label>
                 <input
-                  type="text"
+                  type="time"
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
                   placeholder="09:00"
@@ -104,7 +120,7 @@ export function AddEventModal({
                   End Time
                 </label>
                 <input
-                  type="text"
+                  type="time"
                   value={end}
                   onChange={(e) => setEnd(e.target.value)}
                   placeholder="10:00"
@@ -137,6 +153,7 @@ export function AddEventModal({
             </button>
             <button
               type="submit"
+              disabled={saving}
               className="signal-button px-5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-md"
             >
               <Plus className="w-4 h-4" />

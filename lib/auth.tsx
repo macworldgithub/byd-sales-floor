@@ -8,6 +8,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authApi, setToken, clearToken, getToken } from './api';
+import { isFloorAdmin } from './floorCalendar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,7 +16,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'manager' | 'agent' | 'consultant';
+  role: 'super_admin' | 'admin' | 'site_admin' | 'manager' | 'sales_manager' | 'agent' | 'consultant' | 'sales_consultant' | 'bdc' | 'delivery' | 'delivery_consultant';
   site?: string;
   locked_site?: string;
   allowed_sites?: string[];
@@ -43,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [savedSite, setSavedSite] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('byd_floor_site') || '' : '');
   const assignedSites = user?.allowed_sites && !user.all_sites ? user.allowed_sites : null;
-  const activeSite = assignedSites ? (assignedSites.includes(savedSite) ? savedSite : user?.site || assignedSites[0]) : user?.locked_site || '';
+  const activeSite = isFloorAdmin(user?.role) ? 'All Sites' : assignedSites ? (assignedSites.includes(savedSite) ? savedSite : user?.site || assignedSites[0]) : user?.locked_site || user?.site || '';
   const setActiveSite = (site: string) => {
     if (assignedSites && !assignedSites.includes(site)) return;
     setSavedSite(site); localStorage.setItem('byd_floor_site', site);
@@ -60,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await authApi.me();
         if (res.success && res.data) {
-          setUser(res.data);
+          setUser({ ...res.data, id: res.data.id || res.data._id });
         } else {
           clearToken();
         }
@@ -78,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await authApi.login(email, password);
     if (!res.success) throw new Error('Login failed');
     setToken(res.data.access_token);
-    setUser(res.data.user);
+    setUser({ ...res.data.user, id: res.data.user.id || res.data.user._id });
     if (res.data.user.allowed_sites && !res.data.user.all_sites) setActiveSite(res.data.user.site || res.data.user.allowed_sites[0]);
   }, []);
 

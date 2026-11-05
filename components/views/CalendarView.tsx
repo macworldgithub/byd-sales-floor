@@ -1,580 +1,94 @@
 'use client';
+import React, { useEffect, useRef, useState } from 'react';
+import { appointmentApi, floorApi } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { addDays, calendarRange, melbourneDay, navigateCalendar, type CalendarMode, type FloorEvent, type PageInfo } from '@/lib/floorCalendar';
+import { Pagination } from '@/components/ui/Pagination';
+import type { TimelineEvent } from '@/lib/types';
 
-import React, { useState } from 'react';
-import {
-  Calendar as CalendarIcon,
-  Plus,
-  Clock,
-  Car,
-  AlertCircle,
-  BatteryCharging,
-  ChevronRight,
-  Download,
-  CheckCircle,
-  XCircle,
-  RotateCcw,
-  Sparkles,
-} from 'lucide-react';
-import { TimelineEvent } from '@/lib/types';
-import { ASSET_PATHS, FLEET_VEHICLES, TEAM_MEMBERS } from '@/lib/data';
-import { appointmentApi, sequenceApi } from '@/lib/api';
+interface Props { timelineEvents?: TimelineEvent[]; onOpenAddEvent: (date: string) => void; onOpenBookDrive: (date: string) => void; refreshKey?: number }
+export function CalendarView({ onOpenAddEvent, onOpenBookDrive, refreshKey = 0 }: Props) {
+  const { activeSite, user } = useAuth();
+  const [mode, setMode] = useState<CalendarMode>('day');
+  const [date, setDate] = useState(melbourneDay);
+  const [category, setCategory] = useState('all');
+  const [consultant, setConsultant] = useState('');
+  const [status, setStatus] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [events, setEvents] = useState<FloorEvent[]>([]);
+  const [pagination, setPagination] = useState<PageInfo>({ total: 0, page: 1, pages: 1, limit: 50 });
+  const [filters, setFilters] = useState<{ consultants: string[]; statuses: string[] }>({ consultants: [], statuses: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState<FloorEvent | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const sequence = useRef(0);
+  const range = calendarRange(date, mode);
+  const params = { from: range.from, to: range.to, category, consultant, status, q: search.trim() };
 
-interface CalendarViewProps {
-  timelineEvents: TimelineEvent[];
-  onOpenAddEvent: () => void;
-  onOpenBookDrive: () => void;
-}
+  useEffect(() => {
+    const request = ++sequence.current;
+    setLoading(true); setError(''); setEvents([]); setSelected(null);
+    const timer = setTimeout(async () => {
+      try {
+        const result = await floorApi.calendar({ from: range.from, to: range.to, category, consultant, status, q: search.trim(), page: String(page), limit: '50' });
+        if (request !== sequence.current) return;
+        if (!result.success) throw new Error(result.message || 'Unable to load calendar');
+        setEvents(result.data || []); setPagination(result.pagination);
+        setFilters(result.meta?.filters || { consultants: [], statuses: [] });
+        if (result.pagination.page !== page) setPage(result.pagination.page);
+      } catch (error: any) { if (request === sequence.current) setError(error.message || 'Unable to load calendar'); }
+      finally { if (request === sequence.current) setLoading(false); }
+    }, 200);
+    return () => { clearTimeout(timer); sequence.current++; };
+  }, [range.from, range.to, category, consultant, status, search, page, activeSite, user?.id, revision, refreshKey]);
 
-export function CalendarView({
-  timelineEvents,
-  onOpenAddEvent,
-  onOpenBookDrive,
-}: CalendarViewProps) {
-  const [viewMode, setViewMode] = useState<'myDay' | 'week' | 'month' | 'team'>('myDay');
-  const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
-  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const timeSlots = [
-    '08:00',
-    '09:00',
-    '10:00',
-    '11:00',
-    '12:00',
-    '13:00',
-    '14:00',
-    '15:00',
-    '16:00',
-    '17:00',
-  ];
-
-  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  const monthDays = Array.from({ length: 30 }, (_, i) => i + 1);
-
-  const getEventPosition = (time: string, end: string) => {
-    const parseTime = (t: string) => {
-      const parts = t.split(':').map(Number);
-      const h = parts[0] || 8;
-      const m = parts[1] || 0;
-      return (h - 8) * 60 + m;
-    };
-
-    const startMin = parseTime(time);
-    const endMin = parseTime(end);
-    const totalMin = 10 * 60;
-
-    const topPct = Math.max(0, Math.min(100, (startMin / totalMin) * 100));
-    const heightPct = Math.max(((endMin - startMin) / totalMin) * 100, 7);
-
-    return { top: `${topPct}%`, height: `${heightPct}%` };
-  };
-
-  const getEventClass = (type: TimelineEvent['type']) => {
-    switch (type) {
-      case 'drive':
-        return 'calendar-drive';
-      case 'delivery':
-        return 'calendar-delivery';
-      case 'followup':
-        return 'calendar-followup';
-      case 'hold':
-        return 'calendar-hold';
-      default:
-        return 'calendar-hold';
-    }
-  };
-
-  const handleExportIcs = () => {
-    const url = appointmentApi.getExportIcsUrl();
-    window.open(url, '_blank');
-  };
-
-  const handleMarkOutcome = async (outcome: 'Completed' | 'No Show') => {
-    if (!selectedEvent) return;
-    setIsProcessing(true);
+  const changeDate = (value: string) => { if (/^\d{4}-\d{2}-\d{2}$/.test(value)) { setDate(value); setPage(1); } };
+  const outcome = async (value: 'Completed' | 'No Show') => {
+    const id = selected?.rawObject?.appointment_id;
+    if (!id) return;
+    setSaving(true); setError('');
     try {
-      // Find appointment or patch by event title
-      const appointmentId = (selectedEvent as any)._id || (selectedEvent as any).id || 'apt-latest';
-      await appointmentApi.updateAppointment(appointmentId, {
-        status: outcome,
-      });
-
-      if (outcome === 'No Show') {
-        // Trigger SEQ-NOSHOW cadence enrollment if possible
-        try {
-          await sequenceApi.enrollLead('SEQ-NOSHOW', {
-            prospectName: selectedEvent.title.replace('Test drive · ', ''),
-            phone: '+61 412 890 234',
-          });
-        } catch {}
-        setActionFeedback('Marked as No Show. Enrolled in SEQ-NOSHOW re-engagement sequence.');
-      } else {
-        setActionFeedback('Appointment marked as Met & Completed. Opportunity stage moved forward.');
-      }
-
-      setTimeout(() => {
-        setSelectedEvent(null);
-        setActionFeedback(null);
-      }, 1500);
-    } catch (err: any) {
-      setActionFeedback(`Status updated locally to ${outcome}.`);
-      setTimeout(() => {
-        setSelectedEvent(null);
-        setActionFeedback(null);
-      }, 1500);
-    } finally {
-      setIsProcessing(false);
-    }
+      const result = await appointmentApi.updateAppointment(id, { status: value });
+      if (!result.success) throw new Error(result.message || 'The appointment could not be updated');
+      setSelected(null); setRevision(value => value + 1);
+    } catch (error: any) { setError(error.message || 'The appointment could not be updated'); }
+    finally { setSaving(false); }
   };
+  const eventButton = (event: FloorEvent) => <button key={event.id} onClick={() => setSelected(event)} className={`w-full text-left rounded-lg border p-2 text-xs ${event.type === 'delivery' ? 'bg-emerald-50' : event.type === 'drive' ? 'bg-cyan-50' : 'bg-amber-50'}`}>
+    <span className="font-mono">{event.timeStr}–{event.endTimeStr}</span><strong className="block">{event.title}</strong>
+    <span className="block text-slate-600">{[event.vehicle, event.consultant, event.site].filter(Boolean).join(' · ')}</span><span className="block text-slate-500">{event.status}</span>
+  </button>;
+  const dayEvents = (value: string) => events.filter(event => event.dateStr === value);
+  const monthOffset = (new Date(range.from + 'T12:00:00Z').getUTCDay() + 6) % 7;
+  const gridStart = addDays(range.from, -monthOffset);
+  const dayCount = Math.round((Date.parse(range.to) - Date.parse(range.from)) / 86400000);
 
-  return (
-    <div className="view-stack">
-      {/* Page Intro Banner */}
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Working Calendar · Showroom & Test Drive Operations</p>
-          <h1 className="page-title">THE FLOOR, AT A GLANCE.</h1>
-          <p className="page-subtitle">
-            Coordinate appointments, demo loops and handovers. RFC 5545 iCalendar sync and outcome tracking enabled.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Segmented View Mode */}
-          <div className="segmented flex flex-wrap gap-1">
-            <button
-              type="button"
-              onClick={() => setViewMode('myDay')}
-              className={viewMode === 'myDay' ? 'active' : ''}
-            >
-              My Day
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('week')}
-              className={viewMode === 'week' ? 'active' : ''}
-            >
-              Week View
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('month')}
-              className={viewMode === 'month' ? 'active' : ''}
-            >
-              Month View
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('team')}
-              className={viewMode === 'team' ? 'active' : ''}
-            >
-              Team Grid
-            </button>
-          </div>
-
-          <button
-            onClick={handleExportIcs}
-            className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition-colors"
-            title="Download RFC 5545 iCalendar (.ics) for Outlook / Apple Calendar / Google Calendar"
-          >
-            <Download className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Export (.ics)</span>
-          </button>
-
-          <button
-            onClick={onOpenBookDrive}
-            className="signal-button px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Book Drive</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Calendar Container */}
-      <div className="calendar-shell">
-        {/* Calendar Toolbar */}
-        <div className="calendar-toolbar">
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="w-4 h-4 text-slate-500" />
-            <strong className="text-xs sm:text-sm font-semibold text-slate-900">
-              Monday, 8 September · Melbourne AEST
-            </strong>
-          </div>
-
-          {/* Legend */}
-          <div className="hidden sm:flex items-center gap-4 text-xs font-medium text-slate-500">
-            <div className="legend-item">
-              <i className="bg-cyan-500" />
-              <span>Drive</span>
-            </div>
-            <div className="legend-item">
-              <i className="bg-[#e60012]" />
-              <span>Delivery</span>
-            </div>
-            <div className="legend-item">
-              <i className="bg-amber-500" />
-              <span>Follow-up</span>
-            </div>
-            <div className="legend-item">
-              <i className="bg-slate-400" />
-              <span>Hold</span>
-            </div>
-          </div>
-        </div>
-
-        {/* View Mode: My Day */}
-        {viewMode === 'myDay' && (
-          <div className="day-calendar">
-            {/* Time Gutter */}
-            <div className="time-gutter">
-              {timeSlots.map((time, idx) => (
-                <span key={idx}>{time}</span>
-              ))}
-            </div>
-
-            {/* Day Track Area */}
-            <div className="day-track h-[650px] relative">
-              {/* Hour Grid Lines */}
-              {Array.from({ length: 10 }).map((_, idx) => (
-                <div key={idx} className="hour-line" />
-              ))}
-
-              {/* Now Time Line indicator */}
-              <div className="now-line" style={{ top: '8.5%' }}>
-                <span>NOW · 08:51 AM</span>
-              </div>
-
-              {/* Event Blocks */}
-              {timelineEvents.map((evt, idx) => {
-                const pos = getEventPosition(evt.time, evt.end);
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => setSelectedEvent(evt)}
-                    className={`calendar-event ${getEventClass(evt.type)} cursor-pointer hover:scale-[1.01] transition-transform shadow-xs`}
-                    style={{
-                      top: pos.top,
-                      height: pos.height,
-                      left: '12px',
-                      right: '12px',
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold uppercase text-[10px] tracking-wider">{evt.type}</span>
-                      <small className="font-mono">{evt.time} - {evt.end}</small>
-                    </div>
-                    <strong>{evt.title}</strong>
-                    <small>{evt.detail}</small>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Context Sidebar (Desktop) */}
-            <div className="calendar-context p-4 space-y-4">
-              <div className="rounded-xl overflow-hidden shadow-sm relative h-36">
-                <img
-                  src={ASSET_PATHS.testDrive}
-                  alt="BYD Demo Fleet"
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 flex flex-col justify-end">
-                  <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider font-mono">
-                    Showroom Demo Fleet
-                  </span>
-                  <p className="text-xs text-white font-semibold">3 vehicles staged & charged</p>
-                </div>
-              </div>
-
-              {/* Fleet List */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
-                  Available Fleet
-                </p>
-                {FLEET_VEHICLES.map((car) => (
-                  <div
-                    key={car.id}
-                    className="p-2.5 rounded-lg border border-slate-200 bg-white flex items-center justify-between shadow-xs"
-                  >
-                    <div>
-                      <strong className="text-xs text-slate-900 block font-semibold">{car.model}</strong>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        {car.plate} · {car.location}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                      <BatteryCharging className="w-3 h-3" />
-                      <span>{car.battery}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Capacity Note */}
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-1">
-                <div className="flex items-center gap-1.5 font-semibold text-xs text-amber-800">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span>Delivery Bay 2 Capacity</span>
-                </div>
-                <p className="text-[11px] text-amber-700 leading-snug">
-                  Reserved for Priya Nair handover (10:30–11:30 AM). Prep detailer scheduled 10:00 AM.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* View Mode: Team */}
-        {viewMode === 'team' && (
-          <div className="overflow-x-auto w-full -mx-px">
-            <div className="team-calendar min-w-[700px]">
-              {/* Team Header */}
-              <div className="team-head">
-                <span>Consultant</span>
-                <span>09:00</span>
-                <span>10:00</span>
-                <span>11:00</span>
-                <span>12:00</span>
-                <span>13:00</span>
-                <span>14:00</span>
-                <span>15:00</span>
-                <span>16:00</span>
-              </div>
-
-              {/* Team Rows */}
-              <div className="divide-y divide-slate-100">
-                {TEAM_MEMBERS.map((member, idx) => (
-                  <div key={idx} className="team-row">
-                    <div className="team-person">
-                      <div className="avatar-mini">{member.avatar}</div>
-                      <div className="min-w-0">
-                        <strong className="text-xs text-slate-900 block truncate">{member.name}</strong>
-                        <span className="text-[10px] text-slate-400 block truncate">
-                          {member.role} · {member.load}% load
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="team-track-grid">
-                      {member.events.map((evt, eIdx) => {
-                        const toneClass =
-                          evt.type === 'drive'
-                            ? 'bg-cyan-100 border border-cyan-300 text-cyan-900'
-                            : evt.type === 'delivery'
-                              ? 'bg-red-100 border border-red-300 text-red-900'
-                              : evt.type === 'followup'
-                                ? 'bg-amber-100 border border-amber-300 text-amber-900'
-                                : 'bg-slate-100 border border-slate-300 text-slate-700';
-
-                        return (
-                          <div
-                            key={eIdx}
-                            className={`team-event ${toneClass}`}
-                            style={{
-                              left: `${evt.start}%`,
-                              width: `${evt.width}%`,
-                            }}
-                          >
-                            <span className="truncate">{evt.title}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* View Mode: Week View (§3.2, §5.2) */}
-        {viewMode === 'week' && (
-          <div className="overflow-x-auto w-full p-4">
-            <div className="min-w-[850px] grid grid-cols-7 gap-3">
-              {daysOfWeek.map((day, dIdx) => (
-                <div key={day} className="bg-slate-50 rounded-xl p-3 border border-slate-200 flex flex-col min-h-[450px]">
-                  <div className="border-b border-slate-200 pb-2 mb-2 flex items-center justify-between">
-                    <div>
-                      <strong className="text-xs font-bold text-slate-900 block">{day}</strong>
-                      <span className="text-[10px] text-slate-500 font-mono">Sep {8 + dIdx}</span>
-                    </div>
-                    <span className="w-2 h-2 rounded-full bg-slate-300" />
-                  </div>
-
-                  <div className="flex-1 space-y-2 overflow-y-auto">
-                    {dIdx === 0 &&
-                      timelineEvents.map((evt, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => setSelectedEvent(evt)}
-                          className={`p-2 rounded-lg border text-left cursor-pointer hover:shadow-sm transition-all text-xs space-y-0.5 ${getEventClass(evt.type)}`}
-                        >
-                          <div className="flex items-center justify-between text-[10px] font-mono">
-                            <span className="font-bold uppercase">{evt.type}</span>
-                            <span>{evt.time}</span>
-                          </div>
-                          <p className="font-bold text-[11px] truncate leading-tight">{evt.title}</p>
-                          <span className="text-[10px] opacity-80 block truncate">{evt.detail}</span>
-                        </div>
-                      ))}
-
-                    {dIdx === 1 && (
-                      <div className="p-2 rounded-lg border calendar-drive text-xs space-y-0.5">
-                        <div className="flex items-center justify-between text-[10px] font-mono">
-                          <span className="font-bold uppercase">Drive</span>
-                          <span>11:00</span>
-                        </div>
-                        <p className="font-bold text-[11px]">David Chen · SEAL</p>
-                        <span className="text-[10px] opacity-80 block">Yarra Loop Demo</span>
-                      </div>
-                    )}
-
-                    {dIdx === 2 && (
-                      <div className="p-2 rounded-lg border calendar-delivery text-xs space-y-0.5">
-                        <div className="flex items-center justify-between text-[10px] font-mono">
-                          <span className="font-bold uppercase">Delivery</span>
-                          <span>14:00</span>
-                        </div>
-                        <p className="font-bold text-[11px]">Priya Nair Handover</p>
-                        <span className="text-[10px] opacity-80 block">Bay 1 · Rego Verified</span>
-                      </div>
-                    )}
-
-                    {dIdx === 4 && (
-                      <div className="p-2 rounded-lg border calendar-followup text-xs space-y-0.5">
-                        <div className="flex items-center justify-between text-[10px] font-mono">
-                          <span className="font-bold uppercase">Follow-up</span>
-                          <span>09:30</span>
-                        </div>
-                        <p className="font-bold text-[11px]">Fleet Quote Review</p>
-                        <span className="text-[10px] opacity-80 block">SolarDrive ABN</span>
-                      </div>
-                    )}
-
-                    {dIdx === 5 && (
-                      <div className="p-2 rounded-lg border calendar-drive text-xs space-y-0.5">
-                        <div className="flex items-center justify-between text-[10px] font-mono">
-                          <span className="font-bold uppercase">Drive</span>
-                          <span>10:30</span>
-                        </div>
-                        <p className="font-bold text-[11px]">Weekend VIP Slot</p>
-                        <span className="text-[10px] opacity-80 block">SEALION 7 AWD</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* View Mode: Month View (§3.2, §5.2) */}
-        {viewMode === 'month' && (
-          <div className="p-4 space-y-3">
-            <div className="grid grid-cols-7 gap-1 text-center font-mono text-xs font-bold text-slate-500 py-1 border-b border-slate-100">
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-                <span key={d}>{d}</span>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-2">
-              {monthDays.map((d) => (
-                <div
-                  key={d}
-                  className={`p-2.5 rounded-xl border text-left min-h-[90px] flex flex-col justify-between transition-all ${
-                    d === 8
-                      ? 'bg-red-50/50 border-[#e60012] shadow-xs'
-                      : 'bg-white border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs font-bold font-mono ${d === 8 ? 'text-[#e60012]' : 'text-slate-700'}`}>
-                      {d}
-                    </span>
-                    {d === 8 && <span className="w-1.5 h-1.5 rounded-full bg-[#e60012]" />}
-                  </div>
-
-                  <div className="space-y-1">
-                    {d === 8 && (
-                      <span className="text-[10px] font-semibold text-cyan-800 bg-cyan-100 px-1.5 py-0.5 rounded block truncate">
-                        4 Test Drives
-                      </span>
-                    )}
-                    {(d === 8 || d === 10 || d === 15) && (
-                      <span className="text-[10px] font-semibold text-red-800 bg-red-100 px-1.5 py-0.5 rounded block truncate">
-                        {d === 8 ? '2 Deliveries' : '1 Delivery'}
-                      </span>
-                    )}
-                    {d % 4 === 0 && d !== 8 && (
-                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded block truncate">
-                        Follow-ups
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Appointment Outcome Action Modal */}
-      {selectedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Appointment Management</p>
-              <h3 className="text-lg font-bold text-slate-900 mt-0.5">{selectedEvent.title}</h3>
-              <p className="text-xs text-slate-500 font-mono mt-0.5">
-                {selectedEvent.time} - {selectedEvent.end} · {selectedEvent.detail}
-              </p>
-            </div>
-
-            <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
-              Log the appointment outcome to update opportunity progression in the CRM and automate sequence triggers.
-            </p>
-
-            {actionFeedback && (
-              <div className="text-xs font-semibold text-emerald-600 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
-                {actionFeedback}
-              </div>
-            )}
-
-            <div className="space-y-2 pt-2">
-              <button
-                type="button"
-                onClick={() => handleMarkOutcome('Completed')}
-                disabled={isProcessing}
-                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-              >
-                <CheckCircle className="w-4 h-4" />
-                <span>Mark Show (Customer Met / Drive Completed)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleMarkOutcome('No Show')}
-                disabled={isProcessing}
-                className="w-full py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-              >
-                <XCircle className="w-4 h-4" />
-                <span>Mark No Show (Trigger SEQ-NOSHOW Cadence)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedEvent(null);
-                  actionFeedback && setActionFeedback(null);
-                }}
-                className="w-full py-2 px-4 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-medium"
-              >
-                Cancel / Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+  return <div className="view-stack">
+    <div className="page-intro flex flex-wrap justify-between gap-3"><div><p className="eyebrow">Working Calendar · Australia/Melbourne</p><h1 className="text-2xl font-semibold">Floor calendar</h1><p className="text-sm text-slate-500">{activeSite || user?.site || 'All Sites'} · {pagination.total.toLocaleString()} events in this range</p></div>
+      <div className="flex flex-wrap gap-2 items-center"><button className="secondary-button px-3 py-2" onClick={() => setRevision(value => value + 1)}>Refresh</button><button className="secondary-button px-3 py-2" onClick={async () => { try { await floorApi.exportCalendar(params); } catch (error: any) { setError(error.message); } }}>Export calendar</button><button className="signal-button px-3 py-2" onClick={() => onOpenAddEvent(date)}>Add event</button><button className="secondary-button px-3 py-2" onClick={() => onOpenBookDrive(date)}>Book test drive</button></div>
     </div>
-  );
+    <section className="surface-card p-4 space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <button aria-label="Previous period" onClick={() => changeDate(navigateCalendar(date, mode, -1))}>←</button><button onClick={() => changeDate(melbourneDay())} className="secondary-button px-3 py-2">Today</button><button aria-label="Next period" onClick={() => changeDate(navigateCalendar(date, mode, 1))}>→</button>
+        <input aria-label="Calendar date" type={mode === 'month' ? 'month' : 'date'} value={mode === 'month' ? date.slice(0, 7) : date} onChange={event => changeDate(mode === 'month' ? event.target.value + '-01' : event.target.value)} className="border rounded-lg p-2" />
+        <select aria-label="Calendar view" value={mode} onChange={event => { setMode(event.target.value as CalendarMode); setPage(1); }} className="border rounded-lg p-2">{(['day', 'week', 'month', 'team'] as CalendarMode[]).map(value => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}</select>
+        <select aria-label="Event type" value={category} onChange={event => { setCategory(event.target.value); setPage(1); }} className="border rounded-lg p-2"><option value="all">All event types</option><option value="drive">Appointments</option><option value="followup">Follow-ups</option><option value="delivery">Deliveries</option><option value="hold">Personal holds</option></select>
+        <select aria-label="Consultant" value={consultant} onChange={event => { setConsultant(event.target.value); setPage(1); }} className="border rounded-lg p-2"><option value="">All consultants</option>{filters.consultants.map(value => <option key={value}>{value}</option>)}</select>
+        <select aria-label="Event status" value={status} onChange={event => { setStatus(event.target.value); setPage(1); }} className="border rounded-lg p-2"><option value="">All statuses</option>{filters.statuses.map(value => <option key={value}>{value}</option>)}</select>
+        <input aria-label="Search calendar" placeholder="Search customer, vehicle or notes" value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} className="border rounded-lg p-2 flex-1 min-w-48" />
+      </div>
+      {error && <p role="alert" className="rounded-lg bg-red-50 text-red-700 p-3">{error}</p>}
+      {loading ? <p role="status" className="p-8 text-center">Loading calendar…</p> : !error && <>
+        {mode === 'month' ? <div className="overflow-x-auto"><div className="grid grid-cols-7 min-w-[700px]">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(value => <div className="p-2 font-semibold text-center" key={value}>{value}</div>)}
+          {Array.from({ length: Math.ceil((dayCount + monthOffset) / 7) * 7 }, (_, index) => addDays(gridStart, index)).map(value => <div key={value} className={`border p-2 min-h-32 space-y-1 ${value.slice(0, 7) !== date.slice(0, 7) ? 'bg-slate-50 text-slate-400' : ''}`}><button className="font-semibold hover:underline" onClick={() => { changeDate(value); setMode('day'); }}>{Number(value.slice(-2))}</button>{dayEvents(value).map(eventButton)}</div>)}
+        </div></div> : mode === 'week' ? <div className="grid grid-cols-1 md:grid-cols-7 gap-2">{Array.from({ length: 7 }, (_, index) => addDays(range.from, index)).map(value => <div key={value} className="border rounded-lg p-2 space-y-2"><button onClick={() => { changeDate(value); setMode('day'); }} className="font-semibold text-sm">{value}</button>{dayEvents(value).map(eventButton)}{!dayEvents(value).length && <p className="text-xs text-slate-400">No events on this page</p>}</div>)}</div> : mode === 'team' ? <div className="grid gap-4 md:grid-cols-3">{[...new Set(events.map(event => event.consultant || 'Unassigned'))].map(name => <div key={name} className="border rounded-lg p-3 space-y-2"><h2 className="font-semibold">{name}</h2>{events.filter(event => (event.consultant || 'Unassigned') === name).map(eventButton)}</div>)}</div> : <div className="space-y-2">{events.map(eventButton)}</div>}
+        {!events.length && <p className="p-8 text-center text-slate-500">No events match this date range and filters.</p>}
+        <Pagination currentPage={pagination.page} totalPages={pagination.pages} totalItems={pagination.total} pageSize={pagination.limit} onPageChange={setPage} itemName="events" isLoading={loading} />
+      </>}
+    </section>
+    {selected && <div className="modal-overlay" onClick={() => setSelected(null)}><div className="modal-container p-6 space-y-4" onClick={event => event.stopPropagation()}><button aria-label="Close event" className="float-right" onClick={() => setSelected(null)}>×</button><h2 className="text-xl font-semibold">{selected.title}</h2><p>{selected.dateStr} · {selected.timeStr}–{selected.endTimeStr} (Melbourne)</p><p>{selected.vehicle}</p><p>{selected.site} · {selected.consultant || 'Unassigned'}</p><p>{selected.status}</p><p>{selected.subtitle}</p>{selected.rawSource === 'appointment' && selected.rawObject?.appointment_id && <div className="flex gap-3"><button disabled={saving} className="signal-button p-2" onClick={() => outcome('Completed')}>Mark completed</button><button disabled={saving} className="secondary-button p-2" onClick={() => outcome('No Show')}>Mark no-show</button></div>}{error && <p role="alert" className="text-red-700">{error}</p>}</div></div>}
+  </div>;
 }

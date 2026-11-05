@@ -12,6 +12,7 @@ import {
   DuplicateCheckResult,
 } from './types';
 import { TemplatePack } from './templateEngine';
+import { normalizeLead, type FloorEvent, type FloorToday } from './floorCalendar';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://byd-sales-floor-backend.vercel.app/api';
 
@@ -43,7 +44,7 @@ export const clearToken = () => {
 export async function fetchApi<T>(
   endpoint: string,
   options: RequestInit = {}
-): Promise<{ success: boolean; data?: T; message?: string; pagination?: any }> {
+): Promise<{ success: boolean; data?: T; message?: string; pagination?: any; meta?: any; hasMore?: boolean }> {
   const headers = new Headers(options.headers);
   headers.set('Content-Type', 'application/json');
 
@@ -101,9 +102,10 @@ export const authApi = {
 // ─── Lead Centre Methods ──────────────────────────────────────────────────────
 
 export const leadApi = {
-  getLeads: (params?: Record<string, string>) => {
+  getLeads: async (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-    return fetchApi<Lead[]>(`/leads${qs}`);
+    const result = await fetchApi<Lead[]>(`/floor/leads${qs}`);
+    return { ...result, data: result.data?.map(normalizeLead) };
   },
   getLead: (id: string) => fetchApi<Lead>(`/leads/${id}`),
   createLead: (data: Partial<Lead>) =>
@@ -113,6 +115,21 @@ export const leadApi = {
   getTimeline: (id: string) => fetchApi<any>(`/leads/${id}/timeline`),
   addNote: (id: string, note: string) =>
     fetchApi<Lead>(`/leads/${id}/notes`, { method: 'POST', body: JSON.stringify({ note }) }),
+};
+
+export const floorApi = {
+  today: (page = 1) => fetchApi<FloorToday>(`/floor/today?page=${page}`),
+  calendar: (params: Record<string, string>) => fetchApi<FloorEvent[]>(`/floor/calendar?${new URLSearchParams(params)}`),
+  exportCalendar: async (params: Record<string, string>) => {
+    const headers = new Headers({ Authorization: `Bearer ${getToken()}` });
+    const site = localStorage.getItem('byd_floor_site');
+    if (site) headers.set('X-Site', site);
+    const response = await fetch(`${BASE_URL}/floor/calendar.ics?${new URLSearchParams(params)}`, { headers });
+    if (!response.ok) throw new Error('Calendar export failed. Please try again.');
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a'); link.href = url; link.download = 'sales-floor-calendar.ics'; link.click();
+    URL.revokeObjectURL(url);
+  },
 };
 
 // ─── Delivery Centre Methods ───────────────────────────────────────────────────
@@ -317,4 +334,12 @@ export const staffApi = {
     const res = await fetchApi<any>(`/staff${query}`);
     return res as unknown as StaffResponse;
   },
+};
+
+export interface VirtualyardOption { id: string; name: string; locationId?: string; registration?: string; phone?: string }
+export interface VirtualyardOptions { yards: VirtualyardOption[]; statuses: VirtualyardOption[]; bookingTypes: VirtualyardOption[] }
+export const virtualyardApi = {
+  options: () => fetchApi<VirtualyardOptions>('/virtualyard/options', { cache: 'no-store' }),
+  lookup: (kind: 'vehicles' | 'users' | 'customers', q = '', limit = 1000, signal?: AbortSignal) =>
+    fetchApi<VirtualyardOption[]>(`/virtualyard/lookup/${kind}?${new URLSearchParams({ q, limit: String(limit) })}`, { cache: 'no-store', signal }),
 };

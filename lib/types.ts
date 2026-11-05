@@ -79,6 +79,14 @@ export interface Delivery {
 }
 
 export interface Appointment {
+  phone?: string;
+  bookingRequestId?: string;
+  virtualyard?: Record<string, any>;
+  virtualyardSync?: { state: string; message?: string };
+  site?: string;
+  dealership?: string;
+  durationMinutes?: number;
+  floorCategory?: 'drive' | 'delivery' | 'hold' | 'followup';
   _id?: string;
   leadId?: string;
   prospectName: string;
@@ -88,11 +96,14 @@ export interface Appointment {
   when: string;
   duration?: number;
   notes?: string;
-  status: 'Booked' | 'Completed' | 'No Show' | 'Cancelled';
+  status: 'Booked' | 'Proposed' | 'Pending' | 'Confirmed' | 'In-Progress' | 'Completed' | 'Rescheduled' | 'No Show' | 'Cancelled';
   createdAt?: string;
 }
 
 export interface TimelineEvent {
+  bookingRequestId?: string;
+  id?: string;
+  date?: string;
   time: string;
   end: string;
   title: string;

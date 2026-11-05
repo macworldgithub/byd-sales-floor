@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Search,
   Plus,
@@ -20,6 +20,8 @@ import {
 import { Lead } from '@/lib/types';
 import { Pagination } from '@/components/ui/Pagination';
 import { leadApi } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { addDays, melbourneDay } from '@/lib/floorCalendar';
 
 interface LeadsViewProps {
   leads: Lead[];
@@ -51,6 +53,10 @@ export function LeadsView({
   const [totalPages, setTotalPages] = useState<number>(Math.ceil((leads.length || 1) / 30));
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const pageSize = 30;
+  const { activeSite, user } = useAuth();
+  const requestId = useRef(0);
+  const [error, setError] = useState('');
+  const [filters, setFilters] = useState<{ stages: string[]; sources: string[]; models: string[] }>({ stages: [], sources: [], models: [] });
 
   // Mark Lost Modal State
   const [lostTargetLead, setLostTargetLead] = useState<Lead | null>(null);
@@ -59,121 +65,42 @@ export function LeadsView({
   const [isSubmittingLost, setIsSubmittingLost] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  const stageOptions = [
-    'All',
-    'TEST DRIVE BOOKED',
-    'NEW ENQUIRIES',
-    'Imported',
-    'Engaged',
-    'Qualified',
-    'Committed',
-  ];
-
-  const sourceOptions = [
-    'All Sources',
-    'Walk-in',
-    'Autogate',
-    'Carsales',
-    'Web',
-    'Phone Inbound',
-  ];
-
-  const modelOptions = [
-    'All Models',
-    'SEALION 7',
-    'SEAL',
-    'ATTO 3',
-    'DOLPHIN',
-    'SHARK 6',
-  ];
+  const stageOptions = ['All', ...filters.stages];
+  const sourceOptions = ['All Sources', ...filters.sources];
+  const modelOptions = ['All Models', ...filters.models];
 
   const fetchLeads = useCallback(async (page: number, stage: string, query: string) => {
-    setIsLoading(true);
+    const sequence = ++requestId.current;
+    setIsLoading(true); setError(''); setLeadsList([]); setSelectedLeadIds([]);
     try {
-      const params: Record<string, string> = {
-        page: String(page),
-        limit: String(pageSize),
-      };
-      if (stage && stage !== 'All') {
-        params.stage = stage;
-      }
-      if (query.trim()) {
-        params.q = query.trim();
-      }
-
-      const res = await leadApi.getLeads(params);
-      if (res.success && res.data) {
-        let resultList = res.data;
-
-        // Apply client-side source and model filters if needed
-        if (selectedSource !== 'All Sources' && selectedSource !== 'All') {
-          resultList = resultList.filter((l) =>
-            (l.source || '').toLowerCase().includes(selectedSource.toLowerCase())
-          );
-        }
-        if (selectedModel !== 'All Models' && selectedModel !== 'All') {
-          resultList = resultList.filter((l) =>
-            (l.vehicle || l.model || '').toUpperCase().includes(selectedModel.toUpperCase())
-          );
-        }
-
-        setLeadsList(resultList);
-        if (res.pagination) {
-          setTotalItems(res.pagination.total);
-          setTotalPages(res.pagination.pages || Math.ceil(res.pagination.total / pageSize) || 1);
-        } else {
-          setTotalItems(resultList.length);
-          setTotalPages(Math.ceil(resultList.length / pageSize) || 1);
-        }
-      }
-    } catch {
-      // Local filtering fallback
-      let filtered = leads.filter((l) => {
-        const matchStage = stage === 'All' || l.stage === stage;
-        const matchSource =
-          selectedSource === 'All Sources' ||
-          selectedSource === 'All' ||
-          (l.source || '').toLowerCase().includes(selectedSource.toLowerCase());
-        const matchModel =
-          selectedModel === 'All Models' ||
-          selectedModel === 'All' ||
-          (l.vehicle || l.model || '').toUpperCase().includes(selectedModel.toUpperCase());
-        const matchQ =
-          !query ||
-          (l.name || '').toLowerCase().includes(query.toLowerCase()) ||
-          (l.vehicle || l.model || '').toLowerCase().includes(query.toLowerCase()) ||
-          (l.phone && l.phone.includes(query));
-        return matchStage && matchSource && matchModel && matchQ;
-      });
-      setLeadsList(filtered.slice((page - 1) * pageSize, page * pageSize));
-      setTotalItems(filtered.length);
-      setTotalPages(Math.ceil(filtered.length / pageSize) || 1);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [leads, pageSize, selectedSource, selectedModel]);
+      const params: Record<string, string> = { page: String(page), limit: String(pageSize) };
+      if (stage !== 'All') params.stage = stage;
+      if (query.trim()) params.q = query.trim();
+      if (selectedSource !== 'All Sources') params.source = selectedSource;
+      if (selectedModel !== 'All Models') params.model = selectedModel;
+      if (selectedScoreBand === 'High') params.scoreMin = '80';
+      if (selectedScoreBand === 'Medium') { params.scoreMin = '60'; params.scoreMax = '79'; }
+      if (selectedScoreBand === 'Low') params.scoreMax = '59';
+      if (selectedRecency === '2h') params.receivedAfter = new Date(Date.now() - 7200000).toISOString();
+      if (selectedRecency === 'Today') params.receivedFrom = melbourneDay();
+      if (selectedRecency === 'Week') params.receivedFrom = addDays(melbourneDay(), -6);
+      const result = await leadApi.getLeads(params);
+      if (sequence !== requestId.current) return;
+      if (!result.success) throw new Error(result.message || 'Unable to load leads');
+      setLeadsList(result.data || []);
+      setTotalItems(result.pagination?.total || 0);
+      setTotalPages(result.pagination?.pages || 1);
+      if (result.pagination?.page && result.pagination.page !== page) setCurrentPage(result.pagination.page);
+      if (result.meta?.filters) setFilters(result.meta.filters);
+    } catch (error: any) {
+      if (sequence === requestId.current) { setError(error.message || 'Unable to load leads'); setTotalItems(0); setTotalPages(1); }
+    } finally { if (sequence === requestId.current) setIsLoading(false); }
+  }, [selectedSource, selectedModel, selectedScoreBand, selectedRecency, activeSite, user?.id, leads]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchLeads(currentPage, selectedStage, searchQuery);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [currentPage, selectedStage, searchQuery, selectedSource, selectedModel, fetchLeads]);
-
-  useEffect(() => {
-    if (
-      leads.length > 0 &&
-      !searchQuery &&
-      selectedStage === 'All' &&
-      (selectedSource === 'All Sources' || selectedSource === 'All') &&
-      (selectedModel === 'All Models' || selectedModel === 'All') &&
-      currentPage === 1
-    ) {
-      setLeadsList(leads);
-      setTotalItems(leads.length);
-      setTotalPages(Math.ceil(leads.length / pageSize) || 1);
-    }
-  }, [leads, searchQuery, selectedStage, selectedSource, selectedModel, currentPage, pageSize]);
+    const timer = setTimeout(() => fetchLeads(currentPage, selectedStage, searchQuery), 250);
+    return () => { clearTimeout(timer); requestId.current++; };
+  }, [currentPage, selectedStage, searchQuery, fetchLeads]);
 
   const handleReassign = async (lead: Lead) => {
     try {
@@ -186,7 +113,7 @@ export function LeadsView({
       setTimeout(() => setToastMsg(null), 2500);
       fetchLeads(currentPage, selectedStage, searchQuery);
     } catch {
-      setToastMsg(`Reassignment queued for ${lead.name}.`);
+      setToastMsg(`Could not reassign ${lead.name}. Please try again.`);
       setTimeout(() => setToastMsg(null), 2500);
     }
   };
@@ -209,7 +136,7 @@ export function LeadsView({
       }, 1200);
       fetchLeads(currentPage, selectedStage, searchQuery);
     } catch {
-      setToastMsg(`Marked as Lost locally.`);
+      setToastMsg(`Could not save the lost status. Please try again.`);
       setTimeout(() => {
         setLostTargetLead(null);
         setToastMsg(null);
@@ -240,6 +167,7 @@ export function LeadsView({
 
   return (
     <div className="view-stack">
+      {error && <div role="alert" className="p-3 rounded-lg bg-red-50 text-red-700">{error}</div>}
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed top-5 right-5 z-50 p-3 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-2">

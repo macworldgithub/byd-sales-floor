@@ -1,316 +1,166 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, Calendar, AlertTriangle, CheckCircle, ShieldAlert } from 'lucide-react';
-import { Lead } from '@/lib/types';
-import { ASSET_PATHS } from '@/lib/data';
-import { appointmentApi } from '@/lib/api';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Calendar } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
+import { Appointment, Lead } from '@/lib/types';
+import { appointmentApi, virtualyardApi, VirtualyardOption, VirtualyardOptions } from '@/lib/api';
+import { melbourneDateTime as melbourneBookingTime } from '@/lib/floorCalendar';
+import { useVirtualyardLookup } from '@/lib/useVirtualyardLookup';
+import { VirtualyardSelect } from '@/components/VirtualyardSelect';
 
-interface BookTestDriveModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  lead?: Lead | null;
-  onConfirmBooking: (data: {
-    customerName: string;
-    model: string;
-    loop: string;
-    time: string;
-    date: string;
-  }) => void;
-}
+interface BookTestDriveModalProps { isOpen: boolean; onClose: () => void; lead?: Lead | null; onBooked: () => void; initialDate?: string }
+const fieldClass = 'w-full text-sm p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none';
+const localStatus: Record<string, Appointment['status']> = { P: 'Pending', C: 'Confirmed', I: 'In-Progress', F: 'Completed', R: 'Rescheduled', X: 'Cancelled', M: 'No Show' };
 
-const VEHICLE_OPTIONS = [
-  'SEALION 7 Premium · Vehicle 03',
-  'SEALION 7 AWD · Vehicle 01',
-  'SEAL Premium · Vehicle 02',
-  'SEAL Performance · Vehicle 05',
-  'ATTO 3 Extended · Vehicle 04',
-  'DOLPHIN Premium · Vehicle 06',
-  'SHARK 6 PHEV · Vehicle 07',
-];
+export function BookTestDriveModal({ isOpen, onClose, lead, onBooked, initialDate }: BookTestDriveModalProps) {
+  const { activeSite: selectedSite } = useAuth();
+  const [options, setOptions] = useState<VirtualyardOptions | null>(null);
+  const [vehicleQuery, setVehicleQuery] = useState('');
+  const [userQuery, setUserQuery] = useState('');
+  const [driverQuery, setDriverQuery] = useState('');
+  const [driver, setDriver] = useState<VirtualyardOption | null>(null);
+  const [vehicleId, setVehicleId] = useState('');
+  const [userId, setUserId] = useState('');
+  const [yardId, setYardId] = useState('');
+  const [bookingType, setBookingType] = useState('T');
+  const [status, setStatus] = useState('C');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [duration, setDuration] = useState('45');
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [savedMessage, setSavedMessage] = useState('');
+  const requestId = useRef('');
+  const inFlight = useRef(false);
+  const vehicleLookup = useVirtualyardLookup('vehicles', vehicleQuery, isOpen && !!options, refresh);
+  const userLookup = useVirtualyardLookup('users', userQuery, isOpen && !!options, refresh);
+  const driverLookup = useVirtualyardLookup('customers', driverQuery, isOpen && !!options, refresh);
+  const vehicles = vehicleLookup.rows;
+  const users = userLookup.rows;
+  const drivers = driverLookup.rows;
 
-const TIME_SLOTS = ['09:00', '10:00', '11:30', '13:15', '14:30', '15:45', '17:00'];
-const DURATION_OPTIONS = ['30 minutes', '45 minutes', '60 minutes', '90 minutes'];
-const LOCATION_OPTIONS = ['Demo loop A (Highway & CBD)', 'Demo loop B (Urban Dynamic)', 'Demo loop C (Suburban)', 'Custom Route'];
-
-export function BookTestDriveModal({
-  isOpen,
-  onClose,
-  lead,
-  onConfirmBooking,
-}: BookTestDriveModalProps) {
-  const [customerName, setCustomerName] = useState(lead?.name ?? '');
-  const [vehicle, setVehicle] = useState('SEALION 7 Premium · Vehicle 03');
-  const [selectedSlot, setSelectedSlot] = useState('13:15');
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [duration, setDuration] = useState('45 minutes');
-  const [location, setLocation] = useState('Demo loop B (Urban Dynamic)');
-  const [sendConfirmation, setSendConfirmation] = useState(true);
-  const [conflictWarning, setConflictWarning] = useState<string | null>(null);
-  const [isCheckingConflict, setIsCheckingConflict] = useState(false);
-
-  useEffect(() => {
-    if (lead?.name) setCustomerName(lead.name);
-  }, [lead]);
-
-  // Check conflicts whenever slot, date, or vehicle changes
   useEffect(() => {
     if (!isOpen) return;
-    const checkConflict = async () => {
-      setIsCheckingConflict(true);
-      try {
-        const startIso = `${selectedDate}T${selectedSlot}:00`;
-        const durationMins = parseInt(duration, 10) || 45;
-        const res = await appointmentApi.checkConflict(startIso, durationMins);
-        if (res.data?.hasConflict) {
-          setConflictWarning(`Conflict detected: ${res.data.count} existing booking(s) overlap with this time window.`);
-        } else {
-          setConflictWarning(null);
-        }
-      } catch {
-        setConflictWarning(null);
-      } finally {
-        setIsCheckingConflict(false);
-      }
-    };
+    setError(''); setSavedMessage('');
+    setVehicleId(''); setUserId(''); setDriver(null); setDriverQuery('');
+    setVehicleQuery(''); setUserQuery('');
+    setDate(initialDate || new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()));
+    requestId.current = crypto.randomUUID();
+  }, [isOpen, selectedSite, lead?._id, initialDate]);
 
-    const timer = setTimeout(checkConflict, 300);
-    return () => clearTimeout(timer);
-  }, [selectedSlot, selectedDate, duration, isOpen]);
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setLoading(true); setError(''); setOptions(null);
+    setVehicleId(''); setUserId(''); setDriver(null);
+    virtualyardApi.options().then(meta => {
+      if (cancelled) return;
+      if (!meta.success || !meta.data) throw new Error(meta.message || 'Could not load Virtual Yard.');
+      setOptions(meta.data);
+      const siteKey = (value: string) => value.toLowerCase().replace(/^byd\s+/, '').replace(/[^a-z0-9]/g, '');
+      setYardId(meta.data.yards.find(yard => siteKey(yard.name) === siteKey(selectedSite))?.id || meta.data.yards[0]?.id || '');
+    }).catch(err => { if (!cancelled) setError(err.message); }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [isOpen, selectedSite, refresh]);
 
+  const targetCustomer = lead || (driver ? { name: driver.name, phone: driver.phone } : null);
   if (!isOpen) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onConfirmBooking({
-      customerName: customerName || (lead?.name ?? 'Customer'),
-      model: vehicle.split(' · ')[0],
-      loop: location,
-      time: selectedSlot,
-      date: selectedDate,
-    });
-    onClose();
+  const selectVehicle = (id: string) => {
+    setVehicleId(id);
+    const vehicle = vehicles.find(row => row.id === id);
+    if (vehicle?.locationId && options?.yards.some(yard => yard.id === vehicle.locationId)) setYardId(vehicle.locationId);
+  };
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (inFlight.current || !targetCustomer || !driver) return;
+    inFlight.current = true; setSubmitting(true); setError('');
+    try {
+      const yard = options?.yards.find(row => row.id === yardId);
+      const vehicle = vehicles.find(row => row.id === vehicleId);
+      if (!yard || !vehicle || !userId) throw new Error('Select a yard, demo vehicle and salesperson.');
+      const response = await appointmentApi.createAppointment({
+        bookingRequestId: requestId.current, leadId: lead?._id, prospectName: targetCustomer.name,
+        phone: targetCustomer.phone, type: 'Test Drive', when: melbourneBookingTime(date, time), durationMinutes: Number(duration),
+        vehicle: vehicle.name, consultantName: users.find(person => person.id === userId)?.name,
+        notes, site: yard.name, dealership: yard.name,
+        status: localStatus[status] || 'Confirmed',
+        virtualyard: { vehicleId, vehicleName: vehicle.name, userId, userName: users.find(person => person.id === userId)?.name, customerId: driver.id, customerName: driver.name, locationId: yardId, bookingType, status },
+      });
+      if (!response.success || !response.data) throw new Error(response.message || 'Could not save booking.');
+      const appointment = response.data;
+      onBooked();
+      if (appointment.virtualyardSync?.state === 'synced') onClose();
+      else setSavedMessage(`Appointment saved in CRM. ${appointment.virtualyardSync?.message || 'Virtual Yard confirmation is pending.'} Review its sync status in Appointments; do not create another booking.`);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not save booking.'); }
+    finally { inFlight.current = false; setSubmitting(false); }
   };
 
+  const select = (label: string, value: string, onChange: (value: string) => void, rows: VirtualyardOption[]) => (
+    <VirtualyardSelect label={label} value={value} onChange={onChange} rows={rows} disabled={submitting || !!savedMessage}
+      yardNames={Object.fromEntries((options?.yards || []).map(yard => [yard.id, yard.name]))} />
+  );
+  const lookupFeedback = (lookup: ReturnType<typeof useVirtualyardLookup>, label: string) => (
+    <div className="space-y-1 text-xs">
+      {lookup.loading && <p role="status" className="text-slate-500">Loading current {label} from Virtual Yard…</p>}
+      {lookup.error && <p role="alert" className="text-red-700">{lookup.error}</p>}
+      {!lookup.loading && !lookup.error && <p className="text-slate-500">{lookup.rows.length} {label} loaded{lookup.hasMore ? ' · more matches available' : ''}.</p>}
+      {lookup.hasMore && (lookup.limit < 50000 ? <button type="button" disabled={lookup.loading} onClick={lookup.loadMore} className="text-red-700 underline disabled:opacity-50">Load more {label}</button> : <p>Enter a more specific search to find the remaining matches.</p>)}
+    </div>
+  );
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)' }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="relative w-full overflow-hidden rounded-2xl shadow-2xl flex"
-        style={{ maxWidth: 900, maxHeight: '92vh', background: '#faf9f7' }}
-      >
-        {/* ── Left panel: dark car image ─────────────────── */}
-        <div
-          className="hidden md:flex flex-col justify-end relative shrink-0"
-          style={{ width: 340, minHeight: 560 }}
-        >
-          <img
-            src={ASSET_PATHS.testDrive}
-            alt="Demo fleet"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 55%, transparent 100%)',
-            }}
-          />
-          <div className="relative z-10 p-6 pb-7">
-            <p
-              className="font-mono text-[10px] font-bold tracking-widest mb-2"
-              style={{ color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}
-            >
-              Demo Fleet
-            </p>
-            <h3 className="font-condensed text-white text-2xl font-semibold leading-tight">
-              {vehicle.split(' · ')[0]}
-            </h3>
-            <p className="mt-1 text-sm text-slate-300">
-              {vehicle.split(' · ')[1] || 'Vehicle 03'} · ACMA Compliant Confirmation Ready
-            </p>
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-sm">
+      <div role="dialog" aria-modal="true" aria-labelledby="test-drive-title" className="bg-white rounded-2xl shadow-2xl max-w-xl w-full flex flex-col max-h-[94vh] overflow-hidden">
+        <div className="p-5 border-b border-slate-200 flex items-center gap-3">
+          <Calendar className="text-[#e60012] w-6 h-6" />
+          <div className="flex-1"><h3 id="test-drive-title" className="font-bold text-slate-900">Book Test Drive</h3><p className="text-xs text-slate-500">Save to CRM and Virtual Yard · Melbourne time</p></div>
+          <button type="button" aria-label="Close booking" disabled={submitting} onClick={onClose}><X className="w-5 h-5" /></button>
         </div>
-
-        {/* ── Right panel: form ───────────────────────────── */}
-        <div className="flex-1 flex flex-col overflow-y-auto">
-          {/* Header */}
-          <div className="px-8 pt-6 pb-4 text-center relative border-b border-slate-100">
-            <button
-              onClick={onClose}
-              className="absolute right-5 top-5 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <h2 className="text-xl font-semibold text-slate-900" style={{ letterSpacing: '-0.02em' }}>
-              {lead ? `Book ${lead.name.split(' ')[0]}'s Test Drive` : 'Book Test Drive'}
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Real-time conflict detection across consultant, customer, and demo vehicle bay.
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="px-8 py-5 space-y-4">
-            {/* Conflict Warning Banner */}
-            {conflictWarning && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-medium animate-in fade-in">
-                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="flex-1">{conflictWarning}</span>
-                <span className="text-[10px] font-bold uppercase bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded">
-                  Override Available
-                </span>
-              </div>
-            )}
-
-            {/* Customer Name */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Customer Name
-              </label>
-              <input
-                type="text"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Full customer name"
-                required
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#e60012]"
-              />
-            </div>
-
-            {/* Date & Vehicle in 2 cols */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Appointment Date
-                </label>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#e60012]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Model & Demo Unit
-                </label>
-                <select
-                  value={vehicle}
-                  onChange={(e) => setVehicle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#e60012]"
-                >
-                  {VEHICLE_OPTIONS.map((v) => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Time Slots */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Select Time Slot
-                </label>
-                {isCheckingConflict && (
-                  <span className="text-[10px] text-slate-400 font-mono animate-pulse">
-                    Checking calendar conflicts...
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-                {TIME_SLOTS.map((slot) => (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => setSelectedSlot(slot)}
-                    className="py-2 rounded-lg text-xs font-semibold transition-all"
-                    style={{
-                      background: selectedSlot === slot ? '#171b22' : '#ffffff',
-                      color: selectedSlot === slot ? '#ffffff' : '#374151',
-                      border: selectedSlot === slot ? '1.5px solid #171b22' : '1px solid #e5e7eb',
-                    }}
-                  >
-                    {slot}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Duration + Route */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Duration
-                </label>
-                <select
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                >
-                  {DURATION_OPTIONS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Demo Route Loop
-                </label>
-                <select
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                >
-                  {LOCATION_OPTIONS.map((l) => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Send Confirmation Checkbox */}
-            <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 bg-white p-3">
-              <input
-                type="checkbox"
-                checked={sendConfirmation}
-                onChange={(e) => setSendConfirmation(e.target.checked)}
-                className="mt-1"
-              />
-              <div>
-                <p className="text-xs font-bold text-slate-900">
-                  Send Instant Confirmation SMS & iCal Invite
-                </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Includes registered sender ID, navigation pin to Melbourne CBD, and 24h reminder.
-                </p>
-              </div>
+        <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4">
+          <button type="button" disabled={loading || submitting || !!savedMessage} onClick={() => setRefresh(value => value + 1)} className="text-xs text-red-700 underline">Refresh Virtual Yard dropdowns</button>
+          {loading && <p role="status" className="text-sm text-slate-500">Loading Virtual Yard booking options…</p>}
+          {error && <p role="alert" className="text-sm text-red-700 bg-red-50 p-3 rounded-lg">{error}</p>}
+          {savedMessage && <p role="status" className="text-sm text-amber-900 bg-amber-50 p-3 rounded-lg">{savedMessage}</p>}
+          {options && <fieldset disabled={submitting || !!savedMessage} className="space-y-4 min-w-0">
+            <p className="text-sm text-slate-600">{lead?.name || "Select a Virtual Yard driver below"}</p>
+            {select('Yard', yardId, value => { setYardId(value); setVehicleId(''); }, options.yards)}
+            <label className="block text-xs font-semibold text-slate-700 space-y-1"><span>Search demo vehicles</span>
+              <input autoComplete="off" className={fieldClass} value={vehicleQuery} disabled={submitting || !!savedMessage} onChange={e => { setVehicleQuery(e.target.value); setVehicleId(''); }} placeholder="Model, stock number or registration" />
             </label>
-
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-2 bg-[#e60012] hover:bg-[#c90010] shadow-md transition-colors"
-              >
-                <Calendar className="w-4 h-4" />
-                <span>Confirm & Stage Vehicle</span>
-              </button>
+            {select('Demo vehicle', vehicleId, selectVehicle, vehicles)}
+            {lookupFeedback(vehicleLookup, 'vehicles')}
+            {!vehicleLookup.loading && !vehicleLookup.error && !vehicles.length && <p className="text-xs text-amber-700">No matching demo vehicles are available.</p>}
+            <label className="block text-xs font-semibold text-slate-700 space-y-1"><span>Search salespeople</span>
+              <input autoComplete="off" className={fieldClass} value={userQuery} disabled={submitting || !!savedMessage} onChange={e => { setUserQuery(e.target.value); setUserId(''); }} placeholder="Salesperson name" />
+            </label>
+            {select('Salesperson', userId, setUserId, users)}
+            {lookupFeedback(userLookup, 'salespeople')}
+            <label className="block text-xs font-semibold text-slate-700 space-y-1"><span>Search Virtual Yard driver</span>
+              <input autoComplete="off" className={fieldClass} value={driverQuery} disabled={submitting || !!savedMessage} onChange={e => { setDriverQuery(e.target.value); setDriver(null); }} placeholder="Driver name, phone or customer ID" />
+            </label>
+            {select('Virtual Yard driver', driver?.id || '', id => setDriver(drivers.find(row => row.id === id) || null), drivers)}
+            {lookupFeedback(driverLookup, 'drivers')}
+            {!driverLookup.loading && !driverLookup.error && !drivers.length && <p className="text-xs text-slate-500">No matching Virtual Yard drivers. Try a name, phone number or customer ID, or add the driver in Virtual Yard first.</p>}
+            <div className="grid grid-cols-2 gap-3">
+              {select('Booking type', bookingType, setBookingType, options.bookingTypes)}
+              {select('Status', status, setStatus, options.statuses)}
             </div>
-          </form>
-        </div>
+            <div className="grid grid-cols-3 gap-3">
+              <label className="block text-xs font-semibold space-y-1"><span>Date</span><input type="date" required value={date} onChange={e => setDate(e.target.value)} className={fieldClass} /></label>
+              <label className="block text-xs font-semibold space-y-1"><span>Time (Melbourne)</span><input type="time" required value={time} onChange={e => setTime(e.target.value)} className={fieldClass} /></label>
+              {select('Duration', duration, setDuration, ['30', '45', '60'].map(id => ({ id, name: `${id} min` })))}
+            </div>
+            <label className="block text-xs font-semibold space-y-1"><span>Notes</span><textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)} className={fieldClass} /></label>
+          </fieldset>}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" disabled={submitting} onClick={onClose} className="px-4 py-2 rounded-xl border text-sm">{savedMessage ? 'Close' : 'Cancel'}</button>
+            {!savedMessage && <button type="submit" disabled={loading || submitting || vehicleLookup.loading || userLookup.loading || driverLookup.loading || !options || !driver || !vehicleId || !userId} className="px-5 py-2 rounded-xl bg-[#e60012] text-white font-semibold text-sm disabled:opacity-50">{submitting ? 'Saving booking…' : 'Confirm booking'}</button>}
+          </div>
+        </form>
       </div>
     </div>
   );

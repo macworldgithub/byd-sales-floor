@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
+import { isFloorAdmin } from '@/lib/floorCalendar';
 import {
   Bell,
   Menu,
@@ -103,7 +104,7 @@ export function Header({
             {user ? `Good morning, ${user.name.split(' ')[0]}` : 'Manager Console'}
           </h2>
         </div>
-        {user?.allowed_sites && !user.all_sites && <select aria-label="Active site" className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs max-w-48" value={activeSite} onChange={event => { setActiveSite(event.target.value); window.location.reload(); }}>
+        {user?.allowed_sites && !user.all_sites && !isFloorAdmin(user.role) && <select aria-label="Active site" className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs max-w-48" value={activeSite} onChange={event => { setActiveSite(event.target.value); window.location.reload(); }}>
           {user.allowed_sites.map(site => <option key={site}>{site}</option>)}
         </select>}
       </div>
@@ -223,24 +224,24 @@ export function Header({
         </div>
 
         {/* Role Switcher (§3.1) */}
-        <div className="role-switch">
+        <div className="role-switch" aria-label="Signed-in role">
           <button
             type="button"
-            onClick={() => setRole('consultant')}
+            disabled={!isFloorAdmin(user?.role)} onClick={() => setRole('consultant')}
             className={role === 'consultant' ? 'active' : ''}
           >
             Consultant
           </button>
           <button
             type="button"
-            onClick={() => setRole('manager')}
+            disabled={!isFloorAdmin(user?.role)} onClick={() => setRole('manager')}
             className={role === 'manager' ? 'active' : ''}
           >
             Manager
           </button>
           <button
             type="button"
-            onClick={() => setRole('principal')}
+            disabled={!isFloorAdmin(user?.role)} onClick={() => setRole('principal')}
             className={role === 'principal' ? 'active' : ''}
           >
             Principal

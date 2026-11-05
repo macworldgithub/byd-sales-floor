@@ -35,22 +35,18 @@ import {
   messageApi,
 } from '@/lib/api';
 import { addToOutbox, flushOutbox } from '@/lib/offlineQueue';
-import {
-  TODAY_TIMELINE_EVENTS,
-  CONVERSATION_THREADS,
-  INITIAL_LEADS,
-  INITIAL_DELIVERIES,
-} from '@/lib/data';
+
 import { Lead, Delivery, TimelineEvent, ConversationThread } from '@/lib/types';
 import { messageRecipient } from '@/lib/messageRecipient';
+import { isFloorAdmin, melbourneDateTime, melbourneDay } from '@/lib/floorCalendar';
 
 export default function SalesFloorApp() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, activeSite, user } = useAuth();
   const router = useRouter();
 
   // Navigation & Role State
   const [activeTab, setActiveTab] = useState<string>('today');
-  const [role, setRole] = useState<'consultant' | 'manager' | 'principal' | 'super_admin'>('super_admin');
+  const [role, setRole] = useState<'consultant' | 'manager' | 'principal' | 'super_admin'>('consultant');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
@@ -65,8 +61,11 @@ export default function SalesFloorApp() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [threads, setThreads] = useState<ConversationThread[]>([]);
-  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>(TODAY_TIMELINE_EVENTS);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [eventDate, setEventDate] = useState(melbourneDay);
+  useEffect(() => { setRole(isFloorAdmin(user?.role) ? 'super_admin' : user?.role === 'sales_manager' || user?.role === 'manager' ? 'manager' : 'consultant'); }, [user?.role]);
 
   // Modal States
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -107,45 +106,14 @@ export default function SalesFloorApp() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [leadsRes, deliveriesRes, threadsRes, apptsRes] = await Promise.all([
+        const [leadsRes, deliveriesRes, threadsRes] = await Promise.all([
           leadApi.getLeads({ limit: '30' }).catch(() => ({ success: false, data: [] })),
           deliveryApi.getClients({ limit: '30' }).catch(() => ({ success: false, data: [] })),
           conversationApi.getConversations().catch(() => ({ success: false, data: [] })),
-          appointmentApi.getAppointments().catch(() => ({ success: false, data: [] })),
         ]);
-
-        if (leadsRes.success && leadsRes.data && leadsRes.data.length > 0) {
-          setLeads(leadsRes.data);
-        } else {
-          setLeads(INITIAL_LEADS as any);
-        }
-
-        if (deliveriesRes.success && deliveriesRes.data && deliveriesRes.data.length > 0) {
-          setDeliveries(deliveriesRes.data);
-        } else {
-          setDeliveries(INITIAL_DELIVERIES as any);
-        }
-
-        if (threadsRes.success && threadsRes.data) {
-          setThreads(threadsRes.data);
-        }
-
-        if (apptsRes.success && apptsRes.data && apptsRes.data.length > 0) {
-          const mappedAppts: TimelineEvent[] = apptsRes.data.map((a: any) => {
-            const start = new Date(a.testDriveDate || a.when);
-            const formatTime = (date: Date) => Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString('en-AU', {
-              timeZone: 'Australia/Melbourne', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-            });
-            return {
-              time: formatTime(start),
-              end: formatTime(new Date(start.getTime() + (a.durationMinutes || 45) * 60000)),
-              title: `${a.type || 'Appointment'} · ${a.prospectName}`,
-              detail: `${a.vehicle || 'BYD Range'} · ${a.notes || 'Melbourne CBD Loop'}`,
-              type: (a.type === 'Test Drive' ? 'drive' : 'followup') as TimelineEvent['type'],
-            };
-          });
-          setTimelineEvents((prev) => [...mappedAppts, ...prev.slice(0, 3)]);
-        }
+        setLeads(leadsRes.success ? leadsRes.data || [] : []);
+        setDeliveries(deliveriesRes.success ? deliveriesRes.data || [] : []);
+        setThreads(threadsRes.success ? threadsRes.data || [] : []);
       } catch (err) {
         console.error('Failed to load initial data:', err);
       } finally {
@@ -154,7 +122,7 @@ export default function SalesFloorApp() {
     };
 
     fetchData();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, activeSite, user?.id, refreshKey]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -216,6 +184,7 @@ export default function SalesFloorApp() {
   };
 
   const handleOpenBookDrive = (lead?: Lead) => {
+    setEventDate(melbourneDay());
     setBookDriveLead(lead || null);
     setIsBookDriveOpen(true);
   };
@@ -223,43 +192,6 @@ export default function SalesFloorApp() {
   const handleOpenMessage = (lead?: Lead | ConversationThread) => {
     setMessageLead(lead ? messageRecipient(lead, leads) : leads[0] || null);
     setIsMessageOpen(true);
-  };
-
-  const handleConfirmTestDrive = async (data: {
-    customerName: string;
-    model: string;
-    loop: string;
-    time: string;
-    date: string;
-  }) => {
-    const newEvent: TimelineEvent = {
-      time: data.time.split(' ')[0],
-      end: '10:00',
-      title: `Test drive · ${data.customerName}`,
-      detail: `${data.model} · ${data.loop.split('(')[0]}`,
-      type: 'drive',
-    };
-    setTimelineEvents((prev) => [newEvent, ...prev]);
-
-    try {
-      // POST to backend appointments route
-      await appointmentApi.createAppointment({
-        prospectName: data.customerName,
-        vehicle: data.model,
-        type: 'Test Drive',
-        when: `${new Date().toISOString().split('T')[0]}T${data.time.padStart(5, '0')}:00`,
-        notes: `Demo Loop: ${data.loop}`,
-        leadId: bookDriveLead?._id,
-      });
-
-      addToast(
-        'success',
-        'Test Drive Confirmed & Staged',
-        `${data.model} reserved for ${data.customerName} at ${data.time}. Staged in Bay 1.`
-      );
-    } catch (err: any) {
-      addToast('info', 'Test Drive Saved Locally', `${data.model} booked for ${data.customerName}.`);
-    }
   };
 
   const handleAddProspect = async (newLeadData: Omit<Lead, 'id' | 'initials'>) => {
@@ -430,9 +362,18 @@ export default function SalesFloorApp() {
     }
   };
 
-  const handleAddCalendarEvent = (evt: TimelineEvent) => {
-    setTimelineEvents((prev) => [...prev, evt]);
-    addToast('success', 'Event Added to Floor Schedule', `${evt.title} (${evt.time} - ${evt.end})`);
+  const handleAddCalendarEvent = async (event: TimelineEvent) => {
+    const start = melbourneDateTime(event.date || eventDate, event.time);
+    const end = melbourneDateTime(event.date || eventDate, event.end);
+    const durationMinutes = (Date.parse(end) - Date.parse(start)) / 60000;
+    if (durationMinutes <= 0) throw new Error('End time must be after the start time.');
+    const result = await appointmentApi.createAppointment({
+      prospectName: event.title, when: start, type: event.type === 'drive' ? 'Test Drive' : event.type === 'followup' ? 'Callback' : 'Showroom Visit',
+      notes: event.detail, durationMinutes, floorCategory: event.type, bookingRequestId: event.bookingRequestId,
+    });
+    if (!result.success) throw new Error(result.message || 'Event could not be saved');
+    setRefreshKey(value => value + 1);
+    addToast('success', 'Event saved', event.title);
   };
 
   const unassignedCount = leads.filter((l) => !l.consultant || l.stage === 'Imported').length;
@@ -489,9 +430,7 @@ export default function SalesFloorApp() {
             >
               {activeTab === 'today' && (
                 <TodayView
-                  leads={leads}
-                  timelineEvents={timelineEvents}
-                  deliveries={deliveries}
+                  refreshKey={refreshKey}
                   onSelectLead={handleSelectLead}
                   onOpenBookDrive={handleOpenBookDrive}
                   onOpenAddProspect={() => setIsAddProspectOpen(true)}
@@ -502,9 +441,9 @@ export default function SalesFloorApp() {
 
               {activeTab === 'calendar' && (
                 <CalendarView
-                  timelineEvents={timelineEvents}
-                  onOpenAddEvent={() => setIsAddEventOpen(true)}
-                  onOpenBookDrive={() => handleOpenBookDrive()}
+                  refreshKey={refreshKey}
+                  onOpenAddEvent={(date) => { setEventDate(date); setIsAddEventOpen(true); }}
+                  onOpenBookDrive={(date) => { handleOpenBookDrive(); setEventDate(date); }}
                 />
               )}
 
@@ -589,7 +528,8 @@ export default function SalesFloorApp() {
         isOpen={isBookDriveOpen}
         onClose={() => setIsBookDriveOpen(false)}
         lead={bookDriveLead}
-        onConfirmBooking={handleConfirmTestDrive}
+        onBooked={() => setRefreshKey(value => value + 1)}
+        initialDate={eventDate}
       />
 
       {/* Add Prospect Modal with Duplicate Guard (§5.4) */}
@@ -616,6 +556,7 @@ export default function SalesFloorApp() {
         isOpen={isAddEventOpen}
         onClose={() => setIsAddEventOpen(false)}
         onAddEvent={handleAddCalendarEvent}
+        initialDate={eventDate}
       />
 
       {/* Notification Center Inbox & Preferences Modal (§3.1, §5.10) */}
