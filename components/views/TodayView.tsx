@@ -202,7 +202,7 @@ export function TodayView({
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 font-mono">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Next Up · In 38 min
+              Next Up{upcoming ? ` · In ${Math.max(0, Math.ceil((Date.parse(upcoming.date) - Date.now()) / 60000))} min` : ''}
             </span>
             <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider font-mono">
               {nextEvent?.time || '—'}
@@ -365,8 +365,8 @@ export function TodayView({
             </div>
 
             <div className="p-4 md:p-5 space-y-1">
-              {timelineEvents.map((evt, idx) => (
-                <div key={idx} className="mini-event">
+              {timelineEvents.map((evt) => (
+                <div key={evt.id} className="mini-event">
                   <div className="mini-time">{evt.time}</div>
                   <div className={`event-dot ${getEventDotClass(evt.type)}`} />
                   <div className="min-w-0">

@@ -361,10 +361,10 @@ export function LeadsView({
                       .substring(0, 2)
                       .toUpperCase()
                   : 'PR');
-              const displayVehicle = lead.vehicle || lead.model || 'BYD Vehicle';
-              const displayStage = lead.stage || lead.status || 'NEW ENQUIRIES';
-              const displayScore = lead.score ?? 85;
-              const displaySource = lead.source || lead.platform || 'Virtual Yard';
+              const displayVehicle = lead.vehicle || lead.model || 'Vehicle not specified';
+              const displayStage = lead.stage || lead.status || 'Not set';
+              const displayScore = lead.score;
+              const displaySource = lead.source || lead.platform || 'Not recorded';
               const displayOwner = lead.allocatedPersonFullName || lead.assignedTo || lead.consultant || 'Unassigned';
 
               return (
@@ -399,7 +399,7 @@ export function LeadsView({
                         {displayStage}
                       </span>
                       <span className="text-[10px] font-bold text-slate-600 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                        {displayScore} PTS
+                        {displayScore == null ? 'Unscored' : `${displayScore} PTS`}
                       </span>
                       <span className="text-[10px] text-slate-400 font-medium">
                         via {displaySource}
@@ -415,7 +415,7 @@ export function LeadsView({
                       <span className="font-semibold text-slate-700 truncate">{displayVehicle}</span>
                       <span>·</span>
                       <span className="text-slate-400 truncate">
-                        {lead.lastTouch || (lead.updatedAt ? new Date(lead.updatedAt).toLocaleDateString() : 'Recent')}
+                        {lead.lastTouch || (lead.updatedAt ? new Date(lead.updatedAt).toLocaleDateString('en-AU', { timeZone: 'Australia/Melbourne' }) : 'No activity recorded')}
                       </span>
                       {displayOwner && displayOwner !== 'Unassigned' && (
                         <>
