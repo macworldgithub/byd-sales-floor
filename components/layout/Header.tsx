@@ -17,6 +17,7 @@ import {
   Calendar,
   X,
 } from 'lucide-react';
+import { SmsReplyBell } from '@/components/customer/SmsReplyBell';
 import { searchApi } from '@/lib/api';
 import { Lead, Delivery, Appointment } from '@/lib/types';
 
@@ -24,9 +25,7 @@ interface HeaderProps {
   role: 'consultant' | 'manager' | 'principal' | 'super_admin';
   setRole: (role: 'consultant' | 'manager' | 'principal' | 'super_admin') => void;
   onOpenMobileNav: () => void;
-  onOpenNotifications: () => void;
   onSelectLead?: (lead: Lead) => void;
-  unreadNotifications?: boolean;
   isOnline?: boolean;
 }
 
@@ -34,9 +33,7 @@ export function Header({
   role,
   setRole,
   onOpenMobileNav,
-  onOpenNotifications,
   onSelectLead,
-  unreadNotifications = true,
   isOnline = true,
 }: HeaderProps) {
   const { user, logout, activeSite, setActiveSite } = useAuth();
@@ -248,15 +245,7 @@ export function Header({
           </button>
         </div>
 
-        {/* Notification Bell */}
-        <button
-          onClick={onOpenNotifications}
-          className="top-icon"
-          aria-label="View notifications"
-        >
-          <Bell className="w-4 h-4" />
-          {unreadNotifications && <span />}
-        </button>
+        <SmsReplyBell scope={activeSite}/>
 
         {/* Profile Pill */}
         <div className="profile-button relative group cursor-default">

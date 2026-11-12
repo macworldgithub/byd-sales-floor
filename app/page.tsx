@@ -22,7 +22,6 @@ import { BookTestDriveModal } from '@/components/modals/BookTestDriveModal';
 import { AddProspectModal } from '@/components/modals/AddProspectModal';
 import { MessageModal } from '@/components/modals/MessageModal';
 import { AddEventModal } from '@/components/modals/AddEventModal';
-import { NotificationCenterModal } from '@/components/modals/NotificationCenterModal';
 import { BulkMessageModal } from '@/components/modals/BulkMessageModal';
 import { ToastContainer, ToastMessage } from '@/components/ui/Toast';
 import { useRouter } from 'next/navigation';
@@ -76,7 +75,6 @@ export default function SalesFloorApp() {
   const [isMessageOpen, setIsMessageOpen] = useState<boolean>(false);
   const [messageLead, setMessageLead] = useState<Lead | null>(null);
   const [isAddEventOpen, setIsAddEventOpen] = useState<boolean>(false);
-  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState<boolean>(false);
   const [isBulkMessageOpen, setIsBulkMessageOpen] = useState<boolean>(false);
   const [bulkMessageLeads, setBulkMessageLeads] = useState<Lead[]>([]);
 
@@ -413,9 +411,7 @@ export default function SalesFloorApp() {
             }
           }}
           onOpenMobileNav={() => setIsMobileNavOpen(true)}
-          onOpenNotifications={() => setIsNotificationCenterOpen(true)}
           onSelectLead={handleSelectLead}
-          unreadNotifications={true}
           isOnline={isOnline}
         />
 
@@ -559,12 +555,6 @@ export default function SalesFloorApp() {
         onClose={() => setIsAddEventOpen(false)}
         onAddEvent={handleAddCalendarEvent}
         initialDate={eventDate}
-      />
-
-      {/* Notification Center Inbox & Preferences Modal (§3.1, §5.10) */}
-      <NotificationCenterModal
-        isOpen={isNotificationCenterOpen}
-        onClose={() => setIsNotificationCenterOpen(false)}
       />
 
       {/* Bulk Broadcast SMS Modal with ACMA Suppression (§3.2) */}
