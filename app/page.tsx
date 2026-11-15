@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { DeliveryNotifications } from '@/components/customer/DeliveryProfile';
+import { PostDeliveryFollowups } from '@/components/customer/PostDeliveryFollowups';
 import { Header } from '@/components/layout/Header';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { TodayView } from '@/components/views/TodayView';
@@ -416,6 +417,7 @@ export default function SalesFloorApp() {
         />
 
         <DeliveryNotifications/>
+        <PostDeliveryFollowups/>
         {/* Scrollable View Area */}
         <main className="app-main">
           <AnimatePresence mode="wait">

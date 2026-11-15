@@ -364,3 +364,25 @@ export const smsReplyApi = {
     if (!result.success || ['failed','error'].includes(result.data?.status || '')) throw new Error(result.message || 'SMS was not sent.');
   },
 };
+
+export interface DeliveryInventoryVehicle {
+  stock_id: string; vin: string; model: string; variant: string; colour: string; status: string;
+}
+export interface PostDeliveryFollowup {
+  id: string; client_id: string; customer_id?: string; customer_name: string; phone: string; vehicle: string;
+  site: string; salesperson_name: string; body: string; due_at: string; status: string;
+}
+export const deliveryInventoryApi = {
+  getStock: (params: { q: string; site?: string; page: number; limit: number }) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value !== undefined) query.set(key, String(value)); });
+    return fetchApi<DeliveryInventoryVehicle[]>(`/customer-delivery/inventory?${query}`);
+  },
+};
+export const postDeliveryApi = {
+  list: (site?: string) => fetchApi<PostDeliveryFollowup[]>(`/customer-delivery/post-delivery-followups${site ? `?${new URLSearchParams({ site })}` : ''}`),
+  complete: (id: string, input: { notes: string; call_outcome: string; text_action: string }) =>
+    fetchApi<PostDeliveryFollowup>(`/customer-delivery/post-delivery-followups/${encodeURIComponent(id)}/complete`, { method: 'POST', body: JSON.stringify(input) }),
+  sendText: (data: { client_id: string; phone: string; site: string; body: string }) =>
+    fetchApi<{ status?: string }>('/messages/send', { method: 'POST', body: JSON.stringify(data) }),
+};

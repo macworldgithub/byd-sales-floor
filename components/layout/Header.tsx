@@ -86,7 +86,7 @@ export function Header({
   return (
     <header className="topbar relative z-30">
       {/* Left Greeting & Mobile Hamburger */}
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <button
           onClick={onOpenMobileNav}
           className="md:hidden icon-button text-slate-700"
@@ -95,13 +95,13 @@ export function Header({
           <Menu className="w-5 h-5" />
         </button>
 
-        <div>
-          <p className="topbar-kicker">{activeSite || user?.site || 'Sales Floor'} · Floor OS</p>
-          <h2 className="text-base font-semibold text-slate-900 tracking-tight">
+        <div className="min-w-0">
+          <p className="topbar-kicker truncate">{activeSite || user?.site || 'Sales Floor'} · Floor OS</p>
+          <h2 className="truncate text-base font-semibold text-slate-900 tracking-tight">
             {user ? `Welcome, ${user.name.split(' ')[0]}` : 'Sales Floor'}
           </h2>
         </div>
-        {user?.allowed_sites && !user.all_sites && !isFloorAdmin(user.role) && <select aria-label="Active site" className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs max-w-48" value={activeSite} onChange={event => { setActiveSite(event.target.value); window.location.reload(); }}>
+        {user?.allowed_sites && user.allowed_sites.length > 1 && !user.all_sites && !isFloorAdmin(user.role) && <select aria-label="Active site" className="max-w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs sm:max-w-48" value={activeSite} onChange={event => { setActiveSite(event.target.value); window.location.reload(); }}>
           {user.allowed_sites.map(site => <option key={site}>{site}</option>)}
         </select>}
       </div>
