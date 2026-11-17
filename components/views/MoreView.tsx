@@ -29,6 +29,7 @@ export function MoreView({
   onOpenAddProspect,
 }: MoreViewProps) {
   const tools = [
+    { title: 'Vehicle Appraisals', desc: 'Guided inspections, trade valuations, wholesaler offers and loan vehicles', icon: Car, action: () => onNavigateTab('appraisals') },
     {
       title: 'Manual SMS Follow-up',
       desc: 'Staff-managed customer messages and follow-up',

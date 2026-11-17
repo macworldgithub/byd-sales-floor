@@ -37,6 +37,7 @@ export function Sidebar({
     { id: 'calendar', label: 'Calendar', icon: Calendar },
     { id: 'leads', label: 'My Leads', icon: Users },
     { id: 'deliveries', label: 'Deliveries', icon: Car },
+    { id: 'appraisals', label: 'Appraisals', icon: Car },
     {
       id: 'conversations',
       label: 'Conversations',

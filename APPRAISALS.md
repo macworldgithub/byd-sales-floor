@@ -1,0 +1,11 @@
+# BYD appraisal workspace
+
+Open **Appraisals** in the sidebar or More tools, or the **Appraisals** tab in Customer 360. Create a draft against an existing authorised customer, complete the guided walk-around and condition report, then submit it for management valuation/approval. The desktop workspace is responsive for browser camera capture.
+
+The workspace includes private photographs/videos/documents, manual and AI-assisted damage review, internal drive logs, drawn loan-car signatures, trade valuations, dealer/wholesaler contacts, expiring recipient-specific bidding links, deal/delivery associations and a searchable historical archive. AI, registration and PPSR buttons reflect configured server providers; missing services do not produce simulated results. Contacts and valuations respect backend site/role permissions. Downloaded source files and media remain protected by the current session.
+
+Managers create private wholesale links and share each with its intended recipient. The `/appraisal-offer/[id]` page reveals vehicle inspection information, permits bid updates before the deadline and hides customer identities, contacts, licences, signatures, contracts and internal values. Link creation does not send messages. Choosing a bid records an internal valuation rather than completing a purchase.
+
+Backend endpoints, provider contracts, persistent storage configuration, migration manifests and acceptance limits are documented in the backend repository's `docs/appraisal-workspace.md`. The older South Morang account export is not the current 1,605-item BYD account. The current account's official CSV contains 1,605 records and its Permissions table contains 86 staff contacts. Full inspection/media and external wholesaler-directory migration remains outstanding; the archive must not be presented as complete until that reconciliation succeeds.
+
+Validation uses TypeScript, `node --test tests/*.test.cjs` and a production build. In constrained local environments where Turbopack cannot open its build-worker port, `npm run build -- --webpack` uses the supported webpack compiler. This release does not update native application binaries or certify the entire combined platform scope.

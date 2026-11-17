@@ -4,10 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { X, Phone, Mail, Calendar, MessageSquare } from 'lucide-react';
 import { Lead, Delivery } from '@/lib/types';
 import { leadApi } from '@/lib/api';
+import { AppraisalsView } from '@/components/appraisals/AppraisalsView';
 import { DeliveryProfile, DeliveryFinance } from '@/components/customer/DeliveryProfile';
 
-type Tab = 'overview' | 'activity' | 'vehicle' | 'finance' | 'delivery' | 'documents' | 'history';
+type Tab = 'overview' | 'activity' | 'vehicle' | 'finance' | 'delivery' | 'documents' | 'history' | 'appraisals';
 const tabs: {id: Tab; label: string; summary: string}[] = [
+  {id:'appraisals',label:'Appraisals',summary:'Guided inspections, private media, drive logs and trade vehicle records.'},
   {id: 'overview', label: 'Overview', summary: 'Customer snapshot, vehicle of interest, current stage and next action.'},
   {id: 'activity', label: 'Activity / Notes', summary: 'Recent calls, SMS and notes from the customer journey. Add internal context or contact the customer.'},
   {id: 'vehicle', label: 'Vehicle & Spec', summary: 'The enquiry vehicle, its stock reference and available specification details.'},
@@ -66,6 +68,7 @@ export function Customer360Modal({lead, delivery, onClose, onOpenBookDrive, onOp
         </div>}
         {tab==='history' && <DeliveryProfile referenceId={referenceId} allowSold={false} historyOnly/>}
         {tab==='vehicle' && <dl className="grid gap-5 rounded-xl border bg-white p-5 sm:grid-cols-2">{[['Enquiry vehicle',vehicle],['Stock reference',lead.virtualyardId || delivery?.vy_order_id || 'Not allocated'],['Registration',delivery?.rego || 'Not recorded'],['VIN',delivery?.vin || 'Not recorded']].map(([label,value]) => <div key={label}><dt className="text-xs font-semibold text-slate-500">{label}</dt><dd className="mt-1 text-sm">{value}</dd></div>)}</dl>}
+        {tab==='appraisals' && <AppraisalsView leadId={referenceId} customerName={lead.name}/>}
         {tab==='finance' && <div className="rounded-xl border bg-white p-5"><DeliveryFinance referenceId={referenceId}/></div>}
         {tab==='delivery' && <DeliveryProfile referenceId={referenceId} vehicle={lead.vehicle || lead.model}/>}
         {tab==='documents' && <div className="space-y-3">{!delivery?.documents?.length ? <p className="rounded-xl border bg-white p-5 text-sm text-slate-500">No linked delivery documents are available on this card. Quotes and contracts can be managed from the CRM customer profile.</p> : delivery.documents.map((doc,index) => <article key={doc._id || index} className="rounded-xl border bg-white p-4"><h3 className="text-sm font-semibold">{doc.title || doc.document_type}</h3><p className="mt-1 text-xs text-slate-500">{doc.status}</p></article>)}</div>}

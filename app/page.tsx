@@ -26,6 +26,7 @@ import { AddEventModal } from '@/components/modals/AddEventModal';
 import { BulkMessageModal } from '@/components/modals/BulkMessageModal';
 import { ToastContainer, ToastMessage } from '@/components/ui/Toast';
 import { useRouter } from 'next/navigation';
+import { AppraisalsView } from '@/components/appraisals/AppraisalsView';
 import { useAuth } from '@/lib/auth';
 import {
   leadApi,
@@ -498,6 +499,7 @@ export default function SalesFloorApp() {
               {activeTab === 'templates' && <TemplateStudioView />}
 
               {activeTab === 'staff' && <StaffView />}
+              {activeTab === 'appraisals' && <AppraisalsView />}
             </motion.div>
           </AnimatePresence>
         </main>
