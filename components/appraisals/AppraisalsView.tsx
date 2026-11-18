@@ -43,6 +43,9 @@ export function AppraisalsView({
     manager = management.includes(user?.role || "");
   const [mode, setMode] = useState("appraisals"),
     [q, setQ] = useState(""),
+    [archiveBatch, setArchiveBatch] = useState(""),
+    [archiveKind, setArchiveKind] = useState(""),
+    [archiveBatches, setArchiveBatches] = useState<{ sourceHash: string; importedAt: string; count: number; type: string }[]>([]),
     [status, setStatus] = useState(""),
     [page, setPage] = useState(1),
     [total, setTotal] = useState(0),
@@ -77,10 +80,12 @@ export function AppraisalsView({
     setSelectedLead(leadId || "");
     setCreating(false);
     setPartner(null);
+    setArchiveBatch("");
+    setArchiveBatches([]);
   }, [activeSite, leadId]);
   useEffect(() => {
     setPage(1);
-  }, [q, status, mode]);
+  }, [q, status, mode, archiveBatch, archiveKind]);
   useEffect(() => {
     let active = true;
     result(fetchApi<Metadata>("/appraisals/metadata"))
@@ -102,6 +107,8 @@ export function AppraisalsView({
       q,
       page: String(page),
       ...(status && mode === "appraisals" ? { status } : {}),
+      ...(archiveBatch && mode === "archive" ? { sourceHash: archiveBatch } : {}),
+      ...(archiveKind && mode === "archive" ? { kind: archiveKind } : {}),
       ...(leadId && mode === "appraisals" ? { leadId } : {}),
       ...(activeSite ? { site: activeSite } : {}),
     });
@@ -117,7 +124,10 @@ export function AppraisalsView({
         setTotal(response.pagination?.total || 0);
         setPages(response.pagination?.pages || 1);
         if (mode === "partners") setPartners(response.data || []);
-        else if (mode === "archive") setArchive(response.data || []);
+        else if (mode === "archive") {
+          setArchive(response.data || []);
+          setArchiveBatches(response.meta?.batches || []);
+        }
         else setRows(response.data || []);
       })
       .catch((e) => {
@@ -129,7 +139,7 @@ export function AppraisalsView({
     return () => {
       active = false;
     };
-  }, [q, status, mode, page, activeSite, leadId, version]);
+  }, [q, status, mode, page, activeSite, leadId, version, archiveBatch, archiveKind]);
   useEffect(() => {
     if (!manager || leadId) return;
     let active = true;
@@ -419,6 +429,15 @@ export function AppraisalsView({
             ))}
           </select>
         )}
+        {mode === "archive" && <>
+          <select aria-label="Archive import batch" value={archiveBatch} onChange={e=>setArchiveBatch(e.target.value)} className="max-w-full rounded-lg border bg-white px-3 py-2 text-sm">
+            <option value="">All imports and retained versions</option>
+            {archiveBatches.map(batch=><option key={batch.sourceHash} value={batch.sourceHash}>{batch.type} · {new Date(batch.importedAt).toLocaleDateString()} · {batch.count.toLocaleString()} rows · {batch.sourceHash.slice(0,8)}</option>)}
+          </select>
+          <select aria-label="Archive record type" value={archiveKind} onChange={e=>setArchiveKind(e.target.value)} className="rounded-lg border bg-white px-3 py-2 text-sm">
+            <option value="">All record types</option><option value="appraisal">Appraisals</option><option value="dealer_staff">Dealer staff</option><option value="dealer">Dealers</option><option value="wholesaler">Wholesalers</option>
+          </select>
+        </>}
         {mode === "partners" && manager && (
           <button
             className={button}
@@ -616,9 +635,10 @@ export function AppraisalsView({
       ) : (
         <div className="space-y-3">
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            Historical source snapshots are preserved separately. The CSV export
-            does not include inspection media or full offer history. Records are
-            not automatically merged into live customers.
+            Each import preserves its source rows and versions. The same appraisal
+            can appear in several snapshots. Select an import to review its counts.
+            CSV exports omit inspection media and full offer history; detailed
+            captures retain the fields and attachments that were retrieved.
           </div>
           {archive.length ? (
             archive.map((row) => (
@@ -635,13 +655,13 @@ export function AppraisalsView({
                       {row.customerName} · {row.site}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      Source row {row.sourceRow} · {row.sourceId}
+                      {row.kind === 'dealer_staff' ? 'Dealer staff' : row.kind === 'appraisal' ? 'Appraisal' : row.kind} · {row.sourceRow ? `Source row ${row.sourceRow} · ` : ''}{row.sourceId}
                     </p>
                   </div>
                   <button
                     className={button}
                     onClick={() =>
-                      downloadJson(row, `iappraise-${row.sourceRow}.json`)
+                      downloadJson(row, `iappraise-${row.sourceRow || row._id}.json`)
                     }
                   >
                     Export original record
@@ -656,7 +676,7 @@ export function AppraisalsView({
                       <div key={key} className="border-b pb-2">
                         <dt className="text-xs text-slate-500">{key}</dt>
                         <dd className="mt-1 break-words text-sm">
-                          {String(value ?? "")}
+                          {value !== null && typeof value === 'object' ? <pre className="max-h-96 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(value,null,2)}</pre> : String(value ?? "")}
                         </dd>
                       </div>
                     ))}
@@ -675,7 +695,7 @@ export function AppraisalsView({
       <footer className="flex items-center justify-between gap-3 text-sm text-slate-500">
         <p>
           {total.toLocaleString()}{" "}
-          {mode === "archive" ? "preserved records" : mode} · Page {page} of{" "}
+          {mode === "archive" ? "archived rows and versions" : mode} · Page {page} of{" "}
           {pages}
         </p>
         <div className="flex gap-2">
