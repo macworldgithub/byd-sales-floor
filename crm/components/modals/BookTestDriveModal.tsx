@@ -14,7 +14,8 @@ const fieldClass = 'w-full text-sm p-2.5 rounded-xl border border-slate-200 bg-s
 const localStatus: Record<string, Appointment['status']> = { P: 'Pending', C: 'Confirmed', I: 'In-Progress', F: 'Completed', R: 'Rescheduled', X: 'Cancelled', M: 'No Show' };
 
 export function BookTestDriveModal({ isOpen, onClose, preselectedCustomer }: BookTestDriveModalProps) {
-  const { customerOptions: customers, selectedSite, createAppointment } = useCrm();
+  const { customerOptions: customers, selectedSite, createAppointment, fetchCustomers } = useCrm();
+  useEffect(() => { if (isOpen) void fetchCustomers({ limit: 50, site: selectedSite }); }, [isOpen, selectedSite, fetchCustomers]);
   const [customerId, setCustomerId] = useState('');
   const [options, setOptions] = useState<VirtualyardOptions | null>(null);
   const [vehicleQuery, setVehicleQuery] = useState('');

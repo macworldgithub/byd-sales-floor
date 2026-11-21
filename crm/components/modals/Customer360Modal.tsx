@@ -73,7 +73,17 @@ export function Customer360Modal({
     addToast,
     reference,
     currentUser,
+    fetchOpportunities,
+    fetchDeliveryWatch,
+    fetchAppointments,
   } = useCrm();
+
+  useEffect(() => {
+    if (!customer?.customer_id) return;
+    void fetchOpportunities({ limit: 50, site: customer.site });
+    void fetchDeliveryWatch({ limit: 20, site: customer.site });
+    void fetchAppointments({ limit: 50, site: customer.site, timeframe: 'Today' });
+  }, [customer?.customer_id, customer?.site, fetchOpportunities, fetchDeliveryWatch, fetchAppointments]);
 
   useEffect(() => {
     if (customer?.customer_id && customer.customer_id !== 'undefined') {

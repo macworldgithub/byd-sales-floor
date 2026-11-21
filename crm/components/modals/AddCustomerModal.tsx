@@ -12,7 +12,8 @@ interface AddCustomerModalProps {
 }
 
 export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCustomerModalProps) {
-  const { customers, selectedSite, addCustomer, sites, reference } = useCrm();
+  const { customers, selectedSite, addCustomer, sites, reference, fetchCustomers } = useCrm();
+  React.useEffect(() => { if (isOpen) void fetchCustomers({ limit: 50, site: selectedSite }); }, [isOpen, selectedSite, fetchCustomers]);
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');

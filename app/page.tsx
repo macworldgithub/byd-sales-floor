@@ -79,9 +79,7 @@ function SalesFloorContent() {
 
   // Data State
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [threads, setThreads] = useState<ConversationThread[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [eventDate, setEventDate] = useState(melbourneDay);
@@ -134,30 +132,23 @@ function SalesFloorContent() {
   // Initial Fetch Effect
   useEffect(() => {
     if (!isAuthenticated || user?.role === 'contractor') return;
-
+    let active = true;
+    setLeads([]);
     const fetchData = async () => {
-      setIsLoading(true);
       try {
-        const [leadsRes, deliveriesRes, threadsRes] = await Promise.all([
-          leadApi.getLeads({ limit: '30' }).catch(() => ({ success: false, data: [] })),
-          deliveryApi.getClients({ limit: '30' }).catch(() => ({ success: false, data: [] })),
-          conversationApi.getConversations().catch(() => ({ success: false, data: [] })),
-        ]);
-        setLeads(leadsRes.success ? leadsRes.data || [] : []);
-        setDeliveries(deliveriesRes.success ? deliveriesRes.data || [] : []);
-        setThreads(threadsRes.success ? threadsRes.data || [] : []);
+        const leadsRes = await leadApi.getLeads({ limit: '30' });
+        if (active) setLeads(leadsRes.success ? leadsRes.data || [] : []);
       } catch (err) {
         console.error('Failed to load initial data:', err);
-      } finally {
-        setIsLoading(false);
       }
     };
 
     fetchData();
+    return () => { active = false; };
   }, [isAuthenticated, activeSite, user?.id, refreshKey]);
 
   useEffect(() => {
-    if (!isAuthenticated || user?.role === 'contractor') return;
+    if (!isAuthenticated || user?.role === 'contractor' || (activeTab !== 'conversations' && !isMessageOpen)) return;
     let active = true;
     let pending = false;
     const refresh = async () => {
@@ -169,10 +160,11 @@ function SalesFloorContent() {
       } catch (err) { console.error('Message refresh failed:', err); }
       finally { pending = false; }
     };
-    const timer = window.setInterval(refresh, 5000);
+    void refresh();
+    const timer = window.setInterval(refresh, 15000);
     window.addEventListener('focus', refresh);
     return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
-  }, [isAuthenticated, user?.role]);
+  }, [isAuthenticated, user?.role, user?.id, activeSite, activeTab, isMessageOpen]);
 
   // Network State & Offline Queue Listener (§3.1, §8.2, §10 AC #9)
   useEffect(() => {

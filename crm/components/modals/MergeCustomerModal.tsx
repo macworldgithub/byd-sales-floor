@@ -16,7 +16,8 @@ export function MergeCustomerModal({
   onClose,
   preselectedCustomer,
 }: MergeCustomerModalProps) {
-  const { customers, mergeCustomers } = useCrm();
+  const { customers, mergeCustomers, selectedSite, fetchCustomers } = useCrm();
+  React.useEffect(() => { if (isOpen) void fetchCustomers({ limit: 50, site: selectedSite }); }, [isOpen, selectedSite, fetchCustomers]);
 
   const [sourceId, setSourceId] = useState('');
   const [targetId, setTargetId] = useState(preselectedCustomer?.customer_id || customers[0]?.customer_id || '');

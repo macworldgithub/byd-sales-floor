@@ -12,7 +12,7 @@ interface AddDealModalProps {
 }
 
 export function AddDealModal({ isOpen, onClose, preselectedStockId }: AddDealModalProps) {
-  const { customers, vyStock, selectedSite, addOpportunity, addToast, reference, sites, fetchReferenceData } = useCrm();
+  const { customers, vyStock, selectedSite, addOpportunity, addToast, reference, sites, fetchReferenceData, fetchCustomers, fetchVyStock } = useCrm();
 
   const [customerId, setCustomerId] = useState('');
   const [model, setModel] = useState('');
@@ -33,6 +33,11 @@ export function AddDealModal({ isOpen, onClose, preselectedStockId }: AddDealMod
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   React.useEffect(() => { if (isOpen) void fetchReferenceData(); }, [isOpen, fetchReferenceData]);
+  React.useEffect(() => {
+    if (!isOpen) return;
+    void fetchCustomers({ limit: 50, site: selectedSite });
+    if (!preselectedStockId) void fetchVyStock({ limit: 20, site: selectedSite });
+  }, [isOpen, selectedSite, preselectedStockId, fetchCustomers, fetchVyStock]);
   React.useEffect(() => {
     if (!isOpen || !preselectedStockId) return;
     const stock = vyStock.find(item => item.stock_id === preselectedStockId);

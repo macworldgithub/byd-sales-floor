@@ -571,8 +571,10 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     setBoardMe(null);
     setBoardTeam(null);
     setDataErrors({});
-    if (currentUser.id && getToken() && currentRole !== 'contractor') void refreshAll();
-  }, [sessionScope, refreshAll, currentRole]);
+    // Each workspace view loads its own paginated records on demand. Opening
+    // Today/PULSE must not also load every CRM dataset and both scoreboards.
+    if (currentUser.id && getToken() && currentRole !== 'contractor') void fetchReferenceData();
+  }, [sessionScope, fetchReferenceData, currentRole]);
   useEffect(() => {
     const check = async () => {
       const response = await runtimeApi.health();

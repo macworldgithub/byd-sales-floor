@@ -11,7 +11,11 @@ function useLive(path: string) {
     const [data, setData] = useState<any>(null);
     const [error, setError] = useState('');
     const version = useRef(0);
+    const pending = useRef(new Set<string>());
     const refresh = useCallback(async () => {
+        const key = `${user?.id}:${activeSite}:${path}`;
+        if (pending.current.has(key)) return;
+        pending.current.add(key);
         const sequence = ++version.current;
         try {
             const value = await operation(path);
@@ -24,6 +28,7 @@ function useLive(path: string) {
             if (sequence === version.current)
                 setError(error instanceof Error ? error.message : 'Live data unavailable.');
         }
+        finally { pending.current.delete(key); }
     }, [path, activeSite, user?.id]);
     useEffect(() => {
         setData(null);
