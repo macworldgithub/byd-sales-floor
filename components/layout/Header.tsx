@@ -1,5 +1,6 @@
 'use client';
 
+import { useCrm } from '@/crm/lib/crmContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { isFloorAdmin } from '@/lib/floorCalendar';
@@ -37,6 +38,9 @@ export function Header({
   isOnline = true,
 }: HeaderProps) {
   const { user, logout, activeSite, setActiveSite } = useAuth();
+  const { sites } = useCrm();
+  const siteOptions = user?.allowed_sites && !user.all_sites ? user.allowed_sites : sites;
+  const canSelectAll = isFloorAdmin(user?.role) && (user?.all_sites || !user?.allowed_sites);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<{
     leads: Lead[];
@@ -95,19 +99,20 @@ export function Header({
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="min-w-0">
+        <div className="hidden min-w-0 sm:block">
           <p className="topbar-kicker truncate">{activeSite || user?.site || 'Sales Floor'} · Floor OS</p>
           <h2 className="truncate text-base font-semibold text-slate-900 tracking-tight">
             {user ? `Welcome, ${user.name.split(' ')[0]}` : 'Sales Floor'}
           </h2>
         </div>
-        {user?.allowed_sites && user.allowed_sites.length > 1 && !user.all_sites && !isFloorAdmin(user.role) && <select aria-label="Active site" className="max-w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs sm:max-w-48" value={activeSite} onChange={event => { setActiveSite(event.target.value); window.location.reload(); }}>
-          {user.allowed_sites.map(site => <option key={site}>{site}</option>)}
+        {siteOptions.length > 0 && <select aria-label="Active dealership" className="max-w-28 rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm sm:max-w-56" value={activeSite} onChange={event => setActiveSite(event.target.value)}>
+          {canSelectAll && <option value="All Sites">All Locations</option>}
+          {Array.from(new Set([...(activeSite && activeSite !== 'All Sites' ? [activeSite] : []), ...siteOptions])).map(site => <option key={site}>{site}</option>)}
         </select>}
       </div>
 
       {/* Center Global Search Bar (§5.11) */}
-      <div ref={searchRef} className="hidden lg:block relative flex-1 max-w-md mx-4">
+      <div ref={searchRef} className={`hidden ${user?.role === 'contractor' ? '' : 'lg:block'} relative flex-1 max-w-md mx-4`}>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 focus-within:bg-white focus-within:border-slate-400 focus-within:shadow-sm transition-all">
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
           <input
@@ -217,35 +222,12 @@ export function Header({
               isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
             }`}
           />
-          <span>{isOnline ? 'Live · AEST' : 'Offline Queue'}</span>
+          <span>{isOnline ? 'Connected' : 'Offline'}</span>
         </div>
 
-        {/* Role Switcher (§3.1) */}
-        <div className="role-switch" aria-label="Signed-in role">
-          <button
-            type="button"
-            disabled={!isFloorAdmin(user?.role)} onClick={() => setRole('consultant')}
-            className={role === 'consultant' ? 'active' : ''}
-          >
-            Consultant
-          </button>
-          <button
-            type="button"
-            disabled={!isFloorAdmin(user?.role)} onClick={() => setRole('manager')}
-            className={role === 'manager' ? 'active' : ''}
-          >
-            Manager
-          </button>
-          <button
-            type="button"
-            disabled={!isFloorAdmin(user?.role)} onClick={() => setRole('principal')}
-            className={role === 'principal' ? 'active' : ''}
-          >
-            Principal
-          </button>
-        </div>
+        <span className="hidden rounded-full border bg-slate-50 px-3 py-1 text-xs font-semibold capitalize text-slate-600 lg:block">{user?.role?.replaceAll('_', ' ')}</span>
 
-        <SmsReplyBell scope={activeSite}/>
+        {user?.role !== 'contractor' && <SmsReplyBell scope={activeSite}/>}
 
         {/* Profile Pill */}
         <div className="profile-button relative group cursor-default">

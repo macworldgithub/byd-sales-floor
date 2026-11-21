@@ -16,7 +16,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'site_admin' | 'manager' | 'sales_manager' | 'agent' | 'consultant' | 'sales_consultant' | 'bdc' | 'delivery' | 'delivery_consultant';
+  role: 'super_admin' | 'admin' | 'site_admin' | 'manager' | 'sales_manager' | 'agent' | 'consultant' | 'sales_consultant' | 'bdc' | 'delivery' | 'delivery_consultant' | 'contractor';
   site?: string;
   locked_site?: string;
   allowed_sites?: string[];
@@ -44,11 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [savedSite, setSavedSite] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('byd_floor_site') || '' : '');
   const assignedSites = user?.allowed_sites && !user.all_sites ? user.allowed_sites : null;
-  const activeSite = isFloorAdmin(user?.role) ? 'All Sites' : assignedSites ? (assignedSites.includes(savedSite) ? savedSite : user?.site || assignedSites[0]) : user?.locked_site || user?.site || '';
-  const setActiveSite = (site: string) => {
+  const activeSite = isFloorAdmin(user?.role) ? (savedSite || (user?.all_sites ? 'All Sites' : user?.site || 'All Sites')) : assignedSites ? (assignedSites.includes(savedSite) ? savedSite : user?.site || assignedSites[0]) : user?.locked_site || user?.site || '';
+  const setActiveSite = useCallback((site: string) => {
     if (assignedSites && !assignedSites.includes(site)) return;
     setSavedSite(site); localStorage.setItem('byd_floor_site', site);
-  };
+  }, [assignedSites]);
 
   // On mount, try to rehydrate session from stored token
   useEffect(() => {
@@ -86,6 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await authApi.logout();
     clearToken();
+    localStorage.removeItem('byd_floor_site');
+    setSavedSite('');
     setUser(null);
     window.location.href = '/login';
   }, []);

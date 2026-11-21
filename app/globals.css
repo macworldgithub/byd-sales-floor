@@ -1711,3 +1711,9 @@
 @media (max-width: 640px) {
   input, select, textarea { font-size: 16px !important; }
 }
+
+/* Keep the current site and account actions readable on compact screens. */
+@media (max-width: 639px) {
+  .topbar .connection-pill { display: none; }
+  .topbar { gap: .5rem; }
+}

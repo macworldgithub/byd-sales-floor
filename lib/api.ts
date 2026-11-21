@@ -103,11 +103,15 @@ export const authApi = {
 
 export const leadApi = {
   getLeads: async (params?: Record<string, string>) => {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    const filterSite = typeof window !== 'undefined' ? localStorage.getItem('byd_floor_site') || '' : '';
+    const qs = '?' + new URLSearchParams({ ...params, filterSite: params?.filterSite || filterSite }).toString();
     const result = await fetchApi<Lead[]>(`/floor/leads${qs}`);
     return { ...result, data: result.data?.map(normalizeLead) };
   },
-  getLead: (id: string) => fetchApi<Lead>(`/leads/${id}`),
+  getLead: async (id: string) => {
+    const response = await fetchApi<Lead>(`/leads/${id}`);
+    return { ...response, data: response.data ? normalizeLead(response.data) : undefined };
+  },
   createLead: (data: Partial<Lead>) =>
     fetchApi<Lead>('/leads', { method: 'POST', body: JSON.stringify(data) }),
   updateLead: (id: string, data: Partial<Lead>) =>
@@ -117,9 +121,10 @@ export const leadApi = {
     fetchApi<Lead>(`/leads/${id}/notes`, { method: 'POST', body: JSON.stringify({ note }) }),
 };
 
+const selectedFloorSite = () => typeof window !== 'undefined' ? localStorage.getItem('byd_floor_site') || '' : '';
 export const floorApi = {
-  today: (page = 1) => fetchApi<FloorToday>(`/floor/today?page=${page}`),
-  calendar: (params: Record<string, string>) => fetchApi<FloorEvent[]>(`/floor/calendar?${new URLSearchParams(params)}`),
+  today: (page = 1) => fetchApi<FloorToday>(`/floor/today?${new URLSearchParams({ page: String(page), filterSite: selectedFloorSite() })}`),
+  calendar: (params: Record<string, string>) => fetchApi<FloorEvent[]>(`/floor/calendar?${new URLSearchParams({ ...params, filterSite: selectedFloorSite() })}`),
   exportCalendar: async (params: Record<string, string>) => {
     const headers = new Headers({ Authorization: `Bearer ${getToken()}` });
     const site = localStorage.getItem('byd_floor_site');

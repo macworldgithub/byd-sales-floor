@@ -40,7 +40,7 @@ export function LeadsView({
   onOpenMessage,
   onOpenBulkMessage,
 }: LeadsViewProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('search') || '' : '');
   const [selectedStage, setSelectedStage] = useState<string>('All');
   const [selectedSource, setSelectedSource] = useState<string>('All Sources');
   const [selectedModel, setSelectedModel] = useState<string>('All Models');
@@ -69,9 +69,9 @@ export function LeadsView({
   const sourceOptions = ['All Sources', ...filters.sources];
   const modelOptions = ['All Models', ...filters.models];
 
-  const fetchLeads = useCallback(async (page: number, stage: string, query: string) => {
+  const fetchLeads = useCallback(async (page: number, stage: string, query: string, background = false) => {
     const sequence = ++requestId.current;
-    setIsLoading(true); setError(''); setLeadsList([]); setSelectedLeadIds([]);
+    if (!background) { setIsLoading(true); setError(''); setLeadsList([]); setSelectedLeadIds([]); }
     try {
       const params: Record<string, string> = { page: String(page), limit: String(pageSize) };
       if (stage !== 'All') params.stage = stage;
@@ -102,12 +102,18 @@ export function LeadsView({
     return () => { clearTimeout(timer); requestId.current++; };
   }, [currentPage, selectedStage, searchQuery, fetchLeads]);
 
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') void fetchLeads(currentPage, selectedStage, searchQuery, true); };
+    const timer = window.setInterval(refresh, 5000); window.addEventListener('focus', refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [fetchLeads, currentPage, selectedStage, searchQuery]);
+
   const handleReassign = async (lead: Lead) => {
     try {
       const id = String(lead._id || lead.id || '');
       await leadApi.updateLead(id, {
-        consultant: 'Team Pool (Round Robin)',
-        stage: 'Imported',
+        assignedTo: '',
+        allocatedPersonFullName: '',
       });
       setToastMsg(`Prospect ${lead.name} released to Team Reallocation Pool.`);
       setTimeout(() => setToastMsg(null), 2500);
@@ -124,8 +130,8 @@ export function LeadsView({
     try {
       const id = String(lostTargetLead._id || lostTargetLead.id || '');
       await leadApi.updateLead(id, {
-        stage: 'Committed', // status lost recorded in notes
-        status: 'Lost',
+        stage: 'LOST',
+        status: 'lost',
         notes: `[MARK LOST: ${lostReason}] ${lostNotes}`,
       });
       setToastMsg(`Marked ${lostTargetLead.name} as Lost (${lostReason}).`);

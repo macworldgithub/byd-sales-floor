@@ -1,5 +1,6 @@
 'use client';
 
+import { useAuth } from '@/lib/auth';
 import React, { useState } from 'react';
 import {
   X,
@@ -19,7 +20,8 @@ import { searchApi, messageApi } from '@/lib/api';
 interface AddProspectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddLead: (lead: Omit<Lead, 'id' | 'initials'>) => void;
+  onAddLead: (lead: Omit<Lead, 'id' | 'initials'>) => Promise<void>;
+  onWarning?: (message: string) => void;
   onOpenExisting?: (lead: any) => void;
 }
 
@@ -28,7 +30,11 @@ export function AddProspectModal({
   onClose,
   onAddLead,
   onOpenExisting,
+  onWarning,
 }: AddProspectModalProps) {
+  const { user, activeSite } = useAuth();
+  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [model, setModel] = useState('SEALION 7 Premium');
   const [stage, setStage] = useState<Lead['stage']>('Engaged');
@@ -89,14 +95,15 @@ export function AddProspectModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    if (saving) return;
+    setSaveError(''); setSaving(true);
     const newLead = {
       name: name || 'New Customer',
       model,
       stage,
       source,
-      phone: phone || '+61 400 123 456',
-      email: email || 'prospect@example.com',
+      phone: phone.trim(),
+      email: email.trim(),
       score: Number(score) || 75,
       lastTouch: 'Just now',
       action: attachTestDrive ? 'Book drive' : 'Make first touch',
@@ -104,19 +111,22 @@ export function AddProspectModal({
       notes: `${notes}${cardUploaded ? ` · [Scanned Card: ${cardUploaded}]` : ''}`,
     };
 
-    onAddLead(newLead);
+    try { await onAddLead(newLead); }
+    catch (error) { setSaveError(error instanceof Error ? error.message : 'Prospect was not saved.'); setSaving(false); return; }
 
     // If instant SMS requested and phone present, fire outbound welcome
     if (sendInstantSms && phone) {
       try {
-        await messageApi.sendMessage({
+        const welcome = await messageApi.sendMessage({
+          site: activeSite,
           phone: phone,
           client_name: name,
-          body: `Hi ${name.split(' ')[0]}, thank you for visiting BYD Melbourne CBD today! It was great meeting you to explore the ${model}. Let me know if you need any specs or pricing. - Alex Rivers, BYD Southport/Melbourne`,
+          body: `Hi ${name.split(' ')[0]}, thank you for visiting ${activeSite || "BYD"} today! It was great meeting you to explore the ${model}. Let me know if you need anything. - ${user?.name || "BYD team"}, ${activeSite}`,
         });
-      } catch {}
+        if (!welcome.success) throw new Error(welcome.message || 'SMS not confirmed.');
+      } catch (error) { onWarning?.('The prospect was saved, but the welcome SMS failed. Review the customer conversation before retrying the message.'); }
     }
-
+    setSaving(false);
     onClose();
   };
 
@@ -191,6 +201,7 @@ export function AddProspectModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
+          {saveError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{saveError}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase font-mono block mb-1">
@@ -347,7 +358,7 @@ export function AddProspectModal({
               Cancel
             </button>
             <button
-              type="submit"
+              type="submit" disabled={saving}
               className="signal-button px-5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-md"
             >
               <UserPlus className="w-4 h-4" />

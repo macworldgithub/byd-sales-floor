@@ -1,5 +1,11 @@
 'use client';
 
+import { DeliveryOperations } from '@/components/views/DeliveryOperations';
+import { FloorSettings } from '@/components/views/FloorSettings';
+import { CrmProvider } from '@/crm/lib/crmContext';
+import { CrmWorkspace } from '@/components/views/CrmWorkspace';
+import { LiveMetrics, PulseView, TasksView, PresenceCheckIn } from '@/components/views/FloorOperations';
+import { floorNavigation, canOpenTab, isManager, resolveFloorTab } from '@/lib/navigation';
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -42,12 +48,24 @@ import { Lead, Delivery, TimelineEvent, ConversationThread } from '@/lib/types';
 import { messageRecipient } from '@/lib/messageRecipient';
 import { isFloorAdmin, melbourneDateTime, melbourneDay } from '@/lib/floorCalendar';
 
-export default function SalesFloorApp() {
+export default function SalesFloorApp() { return <CrmProvider><SalesFloorContent/></CrmProvider>; }
+
+function SalesFloorContent() {
   const { isAuthenticated, isLoading: authLoading, activeSite, user } = useAuth();
   const router = useRouter();
 
   // Navigation & Role State
-  const [activeTab, setActiveTab] = useState<string>('today');
+  const [activeTab, setActiveTabState] = useState<string>('today');
+  const setActiveTab = (tab: string) => {
+    if (tab === 'more') { setIsMobileNavOpen(true); return; }
+    if (!canOpenTab(tab, user?.role)) return;
+    setActiveTabState(tab);
+    const url = new URL(window.location.href); url.searchParams.set('tab', tab); for (const key of ['customer_id', 'lead_id', 'search']) url.searchParams.delete(key); window.history.pushState({}, '', url);
+  };
+  useEffect(() => {
+    const restore = () => setActiveTabState(resolveFloorTab(window.location.search, user?.role));
+    restore(); window.addEventListener('popstate', restore); return () => window.removeEventListener('popstate', restore);
+  }, [user?.role]);
   const [role, setRole] = useState<'consultant' | 'manager' | 'principal' | 'super_admin'>('consultant');
   const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -67,7 +85,7 @@ export default function SalesFloorApp() {
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [eventDate, setEventDate] = useState(melbourneDay);
-  useEffect(() => { setRole(isFloorAdmin(user?.role) ? 'super_admin' : user?.role === 'sales_manager' || user?.role === 'manager' ? 'manager' : 'consultant'); }, [user?.role]);
+  useEffect(() => { setRole(isFloorAdmin(user?.role) ? 'super_admin' : isManager(user?.role) ? 'manager' : 'consultant'); }, [user?.role]);
 
   // Modal States
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -79,6 +97,8 @@ export default function SalesFloorApp() {
   const [isAddEventOpen, setIsAddEventOpen] = useState<boolean>(false);
   const [isBulkMessageOpen, setIsBulkMessageOpen] = useState<boolean>(false);
   const [bulkMessageLeads, setBulkMessageLeads] = useState<Lead[]>([]);
+
+  useEffect(() => { setSelectedLead(null); setMessageLead(null); setIsMessageOpen(false); setIsBulkMessageOpen(false); }, [activeSite, user?.id]);
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -100,9 +120,20 @@ export default function SalesFloorApp() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  useEffect(() => {
+    if (!isAuthenticated || user?.role === 'contractor') return;
+    const leadId = new URLSearchParams(window.location.search).get('lead_id');
+    if (!leadId) return;
+    let active = true;
+    void leadApi.getLead(leadId).then(response => {
+      if (active && response.success && response.data) setSelectedLead(response.data);
+    }).catch(error => { if (active) addToast('error', 'Enquiry unavailable', error.message); });
+    return () => { active = false; };
+  }, [isAuthenticated, user?.id, activeSite, addToast]);
+
   // Initial Fetch Effect
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || user?.role === 'contractor') return;
 
     const fetchData = async () => {
       setIsLoading(true);
@@ -126,7 +157,7 @@ export default function SalesFloorApp() {
   }, [isAuthenticated, activeSite, user?.id, refreshKey]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || user?.role === 'contractor') return;
     let active = true;
     let pending = false;
     const refresh = async () => {
@@ -141,7 +172,7 @@ export default function SalesFloorApp() {
     const timer = window.setInterval(refresh, 5000);
     window.addEventListener('focus', refresh);
     return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.role]);
 
   // Network State & Offline Queue Listener (§3.1, §8.2, §10 AC #9)
   useEffect(() => {
@@ -196,48 +227,23 @@ export default function SalesFloorApp() {
   };
 
   const handleAddProspect = async (newLeadData: Omit<Lead, 'id' | 'initials'>) => {
-    const initials = newLeadData.name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .substring(0, 2)
-      .toUpperCase();
-
-    const optimisticLead: Lead = {
-      id: Date.now(),
-      initials,
-      ...newLeadData,
-    };
-
-    setLeads((prev) => [optimisticLead, ...prev]);
-
+    const stageMap: Record<string, string> = { Imported: 'NEW ENQUIRIES', Engaged: 'IN FOLLOW-UP', Qualified: 'AI QUALIFYING', Committed: 'COMMITTED', Delivered: 'DELIVERED', Lost: 'LOST' };
+    const payload = { ...newLeadData, vehicle: newLeadData.vehicle || newLeadData.model,
+      stage: stageMap[newLeadData.stage || ''] || newLeadData.stage || 'NEW ENQUIRIES', dealer: activeSite };
     if (!navigator.onLine) {
-      addToOutbox('create_prospect', newLeadData);
-      addToast(
-        'info',
-        'Prospect Saved Offline',
-        `${newLeadData.name} saved to local outbox. Will sync automatically once online.`
-      );
+      addToOutbox('create_prospect', payload);
+      addToast('info', 'Prospect queued offline', 'This prospect will appear on the floor after it has synchronized with the server.');
       return;
     }
-
     try {
-      const res = await leadApi.createLead(newLeadData);
-      if (res.success && res.data) {
-        setLeads((prev) => [res.data!, ...prev.filter((l) => l.id !== optimisticLead.id)]);
-      }
-      addToast(
-        'success',
-        'Prospect Created & Logged',
-        `${newLeadData.name} added to Lead Centre pipeline (${newLeadData.model || newLeadData.vehicle}) with ${newLeadData.score} intent points.`
-      );
-    } catch (err: any) {
-      addToOutbox('create_prospect', newLeadData);
-      addToast(
-        'warning',
-        'Queued in Offline Outbox',
-        `${newLeadData.name} stored in local queue due to network status.`
-      );
+      const response = await leadApi.createLead(payload);
+      if (!response.success || !response.data) throw new Error(response.message || 'The prospect was not saved.');
+      setLeads(previous => [response.data!, ...previous]);
+      setRefreshKey(value => value + 1);
+      addToast('success', 'Prospect saved', `${newLeadData.name} was added to the Lead Centre.`);
+    } catch (error) {
+      addToast('error', 'Prospect not saved', error instanceof Error ? error.message : 'Please try again.');
+      throw error;
     }
   };
 
@@ -267,100 +273,16 @@ export default function SalesFloorApp() {
   };
 
   const handleUpdateLeadStage = async (leadId: string, newStage?: string) => {
-    setLeads((prev) =>
-      prev.map((l) =>
-        (l._id === leadId || String(l.id) === leadId) ? { ...l, stage: newStage || l.stage } : l
-      )
-    );
-    if (selectedLead && (selectedLead._id === leadId || String(selectedLead.id) === leadId)) {
-      setSelectedLead((prev) => (prev ? { ...prev, stage: newStage || prev.stage } : null));
-    }
-
-    try {
-      if (leadId && !leadId.startsWith('outbox') && leadId.length > 10) {
-        await leadApi.updateLead(leadId, { stage: newStage });
-      }
-      addToast('info', 'Pipeline Stage Updated', `Lead status updated to ${newStage || 'new stage'}.`);
-    } catch (err) {
-      addToast('info', 'Pipeline Stage Updated', `Lead status updated to ${newStage || 'new stage'}.`);
-    }
+    if (!newStage) return;
+    const response = await leadApi.updateLead(leadId, { stage: newStage });
+    if (!response.success) throw new Error(response.message || 'Stage was not saved.');
+    setRefreshKey(value => value + 1);
   };
 
   const handleAddLeadNote = async (leadId: string, note: string) => {
-    try {
-      if (leadId && leadId.length > 10) {
-        await leadApi.addNote(leadId, note);
-      }
-      setLeads((prev) =>
-        prev.map((l) =>
-          (l._id === leadId || String(l.id) === leadId)
-            ? { ...l, notes: l.notes ? `${l.notes}\n${note}` : note }
-            : l
-        )
-      );
-      addToast('success', 'Internal Note Saved', 'Note recorded against customer profile.');
-    } catch (err) {
-      addToast('info', 'Note Recorded', 'Note saved locally.');
-    }
-  };
-
-  const handleAssignLead = async (leadId: number | string, consultantName: string) => {
-    setLeads((prev) =>
-      prev.map((l) =>
-        (l._id === leadId || l.id === leadId)
-          ? {
-              ...l,
-              consultant: consultantName,
-              assignedTo: consultantName,
-              action: 'Book drive',
-              priority: false,
-              stage: 'Engaged',
-            }
-          : l
-      )
-    );
-
-    try {
-      const idStr = String(leadId);
-      if (idStr.length > 10) {
-        await leadApi.updateLead(idStr, {
-          assignedTo: consultantName,
-          allocatedPersonFullName: consultantName,
-          stage: 'Engaged',
-        });
-      }
-      addToast(
-        'success',
-        'Lead Assigned Successfully',
-        `Prospect routed to ${consultantName}. Notification pushed to their floor device.`
-      );
-    } catch (err) {
-      addToast(
-        'success',
-        'Lead Assigned Successfully',
-        `Prospect routed to ${consultantName}. Notification pushed to their floor device.`
-      );
-    }
-  };
-
-  const handleCompleteHandover = async (delivery: Delivery) => {
-    setDeliveries((prev) => prev.filter((d) => (d._id || d.id) !== (delivery._id || delivery.id)));
-    try {
-      if (delivery._id) {
-        await deliveryApi.updateClient(delivery._id, { stage: 'Delivered' });
-      }
-      addToast(
-        'success',
-        'Handover Signed Off & Completed',
-        `${delivery.name}'s ${delivery.vehicle} marked as delivered! Customer welcome packet sent.`
-      );
-    } catch (err) {
-      addToast(
-        'success',
-        'Handover Signed Off & Completed',
-        `${delivery.name}'s ${delivery.vehicle} marked as delivered!`
-      );
-    }
+    const response = await leadApi.addNote(leadId, note);
+    if (!response.success) throw new Error(response.message || 'Note was not saved.');
+    setRefreshKey(value => value + 1);
   };
 
   const handleAddCalendarEvent = async (event: TimelineEvent) => {
@@ -404,21 +326,13 @@ export default function SalesFloorApp() {
         {/* Top Header with Global Search (§5.11) & Offline Status */}
         <Header
           role={role}
-          setRole={(newRole) => {
-            setRole(newRole);
-            if ((newRole === 'manager' || newRole === 'principal') && activeTab === 'today') {
-              setActiveTab('allocation');
-            } else if (newRole === 'consultant' && (activeTab === 'allocation' || activeTab === 'reports')) {
-              setActiveTab('today');
-            }
-          }}
+          setRole={() => {}}
           onOpenMobileNav={() => setIsMobileNavOpen(true)}
           onSelectLead={handleSelectLead}
           isOnline={isOnline}
         />
 
-        <DeliveryNotifications/>
-        <PostDeliveryFollowups/>
+        {user?.role !== 'contractor' && <><DeliveryNotifications/><PostDeliveryFollowups/></>}
         {/* Scrollable View Area */}
         <main className="app-main">
           <AnimatePresence mode="wait">
@@ -429,7 +343,8 @@ export default function SalesFloorApp() {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
             >
-              {activeTab === 'today' && (
+              {activeTab === 'today' && (<>
+                <LiveMetrics/><PresenceCheckIn/>
                 <TodayView
                   refreshKey={refreshKey}
                   onSelectLead={handleSelectLead}
@@ -437,7 +352,7 @@ export default function SalesFloorApp() {
                   onOpenAddProspect={() => setIsAddProspectOpen(true)}
                   onOpenMessage={(l) => handleOpenMessage(l)}
                   onNavigateTab={(tab) => setActiveTab(tab)}
-                />
+                /></>
               )}
 
               {activeTab === 'calendar' && (
@@ -462,12 +377,7 @@ export default function SalesFloorApp() {
                 />
               )}
 
-              {activeTab === 'deliveries' && (
-                <DeliveriesView
-                  deliveries={deliveries}
-                  onOpenMessage={(l) => handleOpenMessage(l)}
-                />
-              )}
+              {activeTab === 'deliveries' && <DeliveryOperations/>}
 
               {activeTab === 'conversations' && (
                 <ConversationsView
@@ -477,14 +387,11 @@ export default function SalesFloorApp() {
                 />
               )}
 
-              {activeTab === 'allocation' && (
-                <AllocationView
-                  unassignedLeads={leads.filter((l) => !l.consultant || l.stage === 'Imported')}
-                  onAssignLead={handleAssignLead}
-                />
-              )}
-
-              {activeTab === 'reports' && <PerformanceView />}
+              {activeTab === 'allocation' && <AllocationView onAssigned={() => setRefreshKey(value => value + 1)} />}
+              {activeTab === 'pulse' && <PulseView onSelectLead={handleSelectLead}/>}
+              {activeTab === 'tasks' && <TasksView/>}
+              {user?.role !== 'contractor' && <CrmWorkspace tab={activeTab}/>}
+              {activeTab === 'settings' && <FloorSettings/>}
 
               {activeTab === 'more' && (
                 <MoreView
@@ -521,6 +428,7 @@ export default function SalesFloorApp() {
         onClose={() => setSelectedLead(null)}
         onOpenBookDrive={(lead) => handleOpenBookDrive(lead)}
         onOpenMessage={(lead) => handleOpenMessage(lead)}
+        onChanged={() => { setRefreshKey(value => value + 1); if (selectedLead?._id) void leadApi.getLead(selectedLead._id).then(response => { if (response.success && response.data) setSelectedLead(current => current?._id === response.data?._id ? response.data! : current); }).catch(() => {}); }}
         onUpdateStage={handleUpdateLeadStage}
         onAddNote={handleAddLeadNote}
       />
@@ -539,6 +447,7 @@ export default function SalesFloorApp() {
         isOpen={isAddProspectOpen}
         onClose={() => setIsAddProspectOpen(false)}
         onAddLead={handleAddProspect}
+        onWarning={message => addToast('warning', 'Welcome SMS not confirmed', message)}
         onOpenExisting={(existing) => {
           setSelectedLead(existing);
         }}

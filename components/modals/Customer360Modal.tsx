@@ -1,5 +1,6 @@
 'use client';
 
+import { LeadTools } from '@/components/customer/LeadTools';
 import React, { useEffect, useState } from 'react';
 import { X, Phone, Mail, Calendar, MessageSquare } from 'lucide-react';
 import { Lead, Delivery } from '@/lib/types';
@@ -7,8 +8,9 @@ import { leadApi } from '@/lib/api';
 import { AppraisalsView } from '@/components/appraisals/AppraisalsView';
 import { DeliveryProfile, DeliveryFinance } from '@/components/customer/DeliveryProfile';
 
-type Tab = 'overview' | 'activity' | 'vehicle' | 'finance' | 'delivery' | 'documents' | 'history' | 'appraisals';
+type Tab = 'actions' | 'overview' | 'activity' | 'vehicle' | 'finance' | 'delivery' | 'documents' | 'history' | 'appraisals';
 const tabs: {id: Tab; label: string; summary: string}[] = [
+  {id: 'actions', label: 'Actions, Video & Merge', summary: 'Pipeline updates, media messages, next actions and duplicate merging.'},
   {id:'appraisals',label:'Appraisals',summary:'Guided inspections, private media, drive logs and trade vehicle records.'},
   {id: 'overview', label: 'Overview', summary: 'Customer snapshot, vehicle of interest, current stage and next action.'},
   {id: 'activity', label: 'Activity / Notes', summary: 'Recent calls, SMS and notes from the customer journey. Add internal context or contact the customer.'},
@@ -18,8 +20,8 @@ const tabs: {id: Tab; label: string; summary: string}[] = [
   {id: 'documents', label: 'Documents', summary: 'Documents already attached to this customer’s linked Delivery profile.'},
   {id: 'history', label: 'History', summary: 'The full customer timeline across the connected sales and delivery systems.'},
 ];
-interface Props { lead: Lead | null; delivery?: Delivery | null; onClose: () => void; onOpenBookDrive: (lead: Lead) => void; onOpenMessage: (lead: Lead) => void; onUpdateStage: (leadId: string, stage: string) => void; onAddNote: (leadId: string, note: string) => void }
-export function Customer360Modal({lead, delivery, onClose, onOpenBookDrive, onOpenMessage, onUpdateStage, onAddNote}: Props) {
+interface Props { onChanged?: () => void; lead: Lead | null; delivery?: Delivery | null; onClose: () => void; onOpenBookDrive: (lead: Lead) => void; onOpenMessage: (lead: Lead) => void; onUpdateStage: (leadId: string, stage: string) => void; onAddNote: (leadId: string, note: string) => void }
+export function Customer360Modal({lead, delivery, onClose, onOpenBookDrive, onOpenMessage, onUpdateStage, onAddNote, onChanged}: Props) {
   const [tab, setTab] = useState<Tab>('overview');
   const [timeline, setTimeline] = useState<any[]>([]);
   const [note, setNote] = useState('');
@@ -55,6 +57,7 @@ export function Customer360Modal({lead, delivery, onClose, onOpenBookDrive, onOp
       <div id="customer-tab-content" role="tabpanel" aria-labelledby={`customer-tab-${tab}`} className="flex-1 space-y-5 overflow-y-auto bg-slate-50/50 p-5 sm:p-6">
         <p className="max-w-3xl text-sm text-slate-600">{tabs.find(t => t.id===tab)?.summary}</p>
         {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        {tab==='actions' && <LeadTools lead={lead} onChanged={onChanged}/>}
         {tab==='overview' && <div className="grid gap-5 md:grid-cols-[240px_1fr]">
           <aside className="space-y-4 rounded-xl border border-slate-200 bg-white p-5"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Contact details</h3><p className="flex items-center gap-2 text-sm"><Phone className="h-4 w-4 text-slate-400"/>{lead.phone || 'No phone recorded'}</p><p className="flex break-all items-center gap-2 text-sm"><Mail className="h-4 w-4 shrink-0 text-slate-400"/>{lead.email || 'No email recorded'}</p><p className="text-sm text-slate-500">Consultant: {lead.consultant || lead.allocatedPersonFullName || 'Unassigned'}</p><button onClick={() => onOpenMessage(lead)} className="w-full rounded-lg border px-3 py-2 text-sm font-semibold">Message customer</button></aside>
           <section className="space-y-5"><div className="rounded-xl border border-slate-200 bg-white p-5"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Vehicle of interest</h3><p className="mt-2 text-xl font-semibold text-slate-900">{vehicle}</p></div>
