@@ -3,7 +3,7 @@ import './globals.css';
 import { AuthProvider } from '@/lib/auth';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://creative-basbousa-ab1bf0.netlify.app'),
+  metadataBase: new URL('https://sales-floor.goodshowroom.com'),
   title: 'BYD Harmony · Sales Floor',
   description: 'BYD Harmony Lead Centre, sales operations and Delivery Centre in one workspace.',
   keywords: ['BYD', 'Melbourne CBD', 'Sales Floor', 'EV', 'SEALION 7', 'SEAL', 'ATTO 3', 'Harmony Auto'],
@@ -17,8 +17,8 @@ export const metadata: Metadata = {
     type: 'website',
     title: 'BYD Harmony · Sales Floor',
     description: 'BYD Harmony Lead Centre, sales operations and Delivery Centre in one workspace.',
-    url: 'https://creative-basbousa-ab1bf0.netlify.app/',
-    siteName: 'BYD Melbourne CBD',
+    url: 'https://sales-floor.goodshowroom.com/',
+    siteName: 'BYD Harmony',
     images: [
       {
         url: '/images/og-image.png',

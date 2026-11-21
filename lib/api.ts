@@ -14,7 +14,7 @@ import {
 import { TemplatePack } from './templateEngine';
 import { normalizeLead, type FloorEvent, type FloorToday } from './floorCalendar';
 
-export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://byd-sales-floor-backend.vercel.app/api';
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sales-floor-backend.goodshowroom.com/api';
 
 const TOKEN_KEY = 'byd_auth_token';
 
