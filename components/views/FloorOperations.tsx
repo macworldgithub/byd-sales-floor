@@ -59,7 +59,7 @@ function Status({ error, loading, retry }: {
 export function LiveMetrics() {
     const [period, setPeriod] = useState('today');
     const { data, error, refresh } = useLive(`/summary?period=${period}`);
-    const metrics = [['Active leads', 'activeLeads'], ['Unactioned leads', 'unactionedLeads'], ['Appointments booked', 'appointmentsBooked'], ['Overdue follow-up', 'overdueSla'], ['Deals completed', 'dealsCompleted'], ['Conversion %', 'conversionRate'], ['Videos sent', 'videosSent'], ['Monthly target', 'monthlyTarget']];
+    const metrics = [['Active leads', 'activeLeads'], ['Unactioned leads', 'unactionedLeads'], ['Appointments scheduled', 'appointmentsBooked'], ['Overdue leads (now)', 'overdueSla'], ['Written / signed sales', 'dealsCompleted'], ['Lead conversion %', 'conversionRate'], ['Videos sent', 'videosSent'], ['Monthly target', 'monthlyTarget']];
     return <section className="view-stack mb-6">
     <div className="flex flex-wrap items-center justify-between gap-3">
     <div>
@@ -73,7 +73,19 @@ export function LiveMetrics() {
             <p className="text-sm text-slate-500">{label}</p>
             <strong className="mt-2 block text-3xl font-semibold tracking-tight text-slate-900">{data[key] ?? '—'}</strong>
             </article>)}</div>}
-    <p className="text-xs text-slate-500">Active and unactioned totals cover enquiries received in the selected period. Unactioned means no recorded contact by call, email or SMS.</p>
+    <p className="text-xs text-slate-500">Lead counts and conversion use enquiries received in the selected period. Overdue leads show the current backlog. Dates use Melbourne time.</p>
+    {!!data?.salesDataQuality?.undatedSales && <p role="status" className="text-xs text-amber-800">{data.salesDataQuality.undatedSales} historical orders have no written date and are excluded from period sales totals.</p>}
+    <details className="text-xs text-slate-500">
+      <summary className="cursor-pointer font-medium">How these figures are counted</summary>
+      <ul className="mt-2 list-disc space-y-1 pl-4">
+        <li>Today starts at midnight in Melbourne. Weekly covers the last seven days; MTD starts on the first of this month.</li>
+        <li>Active and unactioned leads use the enquiry received date. Unactioned means no recorded call, email or SMS.</li>
+        <li>Written / signed sales use the recorded sale or order date and count each transaction once across BYD platforms.</li>
+        <li>Conversion is sold enquiries divided by all enquiries received in the period, including closed enquiries. Archived duplicates are excluded.</li>
+        <li>Overdue leads count each open customer enquiry once, including overdue tasks and agreed follow-up dates. Monthly target always covers the current month.</li>
+        <li>Appointments use their scheduled date, including later today. Videos use their recorded send date.</li>
+      </ul>
+    </details>
     </section>;
 }
 export function PulseView({ onSelectLead }: {
@@ -108,7 +120,7 @@ export function PulseView({ onSelectLead }: {
     <div>
     <p className="eyebrow">Group Management</p>
     <h1 className="page-title">PULSE Dashboard</h1>
-    <p className="mt-2 text-sm text-slate-500">Live salesperson follow-up, conversion and staff presence.</p>
+    <p className="mt-2 text-sm text-slate-500">Current salesperson workload, lifetime enquiry conversion and staff presence.</p>
     </div>
     <button onClick={() => { void refresh(); void staff.refresh(); }} className="rounded-lg border bg-white p-3" aria-label="Refresh PULSE">
     <RefreshCw className="h-4 w-4"/>
@@ -116,7 +128,7 @@ export function PulseView({ onSelectLead }: {
     </div>
     <Status error={error || staff.error || actionError} loading={!data} retry={refresh}/>
     {data && <>
-        <p className="text-sm text-slate-500">Follow-up turns amber at {data.config.followupAmberHours}h and red at {data.config.followupRedHours}h. Conversion thresholds: {data.config.conversionAmber}% / {data.config.conversionGreen}%.</p>
+        <p className="text-sm text-slate-500">Follow-up turns amber at {data.config.followupAmberHours}h and red at {data.config.followupRedHours}h, respecting agreed follow-up dates. Conversion uses recorded sold enquiries and explicit sale links; archived enquiries are excluded. Conversion thresholds: {data.config.conversionAmber}% / {data.config.conversionGreen}%.</p>
         <section aria-label="Salesperson PULSE" className="overflow-hidden rounded-xl border bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
           <h2 className="font-semibold">Salespeople</h2>
@@ -125,7 +137,7 @@ export function PulseView({ onSelectLead }: {
         <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
         <thead className="border-b bg-slate-50 text-xs uppercase text-slate-500">
-        <tr>{['Salesperson', 'Signal', 'Active leads', 'Follow-up due', 'Sales', 'Conversion', 'Presence'].map(label => <th key={label} className="whitespace-nowrap p-4">{label}</th>)}</tr>
+        <tr>{['Salesperson', 'Signal', 'Active leads', 'Follow-up due', 'Converted leads', 'Conversion', 'Presence'].map(label => <th key={label} className="whitespace-nowrap p-4">{label}</th>)}</tr>
         </thead>
         <tbody>{data.consultants.map((person: any) => {
                 const presence = staff.data?.find((row: any) => row.email === person.email)?.presence;
