@@ -6,20 +6,24 @@ import { operation } from '@/lib/operations';
 import { leadApi } from '@/lib/api';
 import { normalizeLead } from '@/lib/floorCalendar';
 import type { Lead } from '@/lib/types';
+import { Pagination } from '@/components/ui/Pagination';
 function useLive(path: string) {
     const { activeSite, user } = useAuth();
     const [data, setData] = useState<any>(null);
     const [error, setError] = useState('');
     const version = useRef(0);
-    const pending = useRef(new Set<string>());
+    const dataKey = useRef('');
+    const currentKey = `${user?.id}:${activeSite}:${path}`;
+    const pending = useRef(new Map<string, Promise<any>>());
     const refresh = useCallback(async () => {
         const key = `${user?.id}:${activeSite}:${path}`;
-        if (pending.current.has(key)) return;
-        pending.current.add(key);
+        const request = pending.current.get(key) || operation(path);
+        pending.current.set(key, request);
         const sequence = ++version.current;
         try {
-            const value = await operation(path);
+            const value = await request;
             if (sequence === version.current) {
+                dataKey.current = key;
                 setData(value);
                 setError('');
             }
@@ -28,7 +32,7 @@ function useLive(path: string) {
             if (sequence === version.current)
                 setError(error instanceof Error ? error.message : 'Live data unavailable.');
         }
-        finally { pending.current.delete(key); }
+        finally { if (pending.current.get(key) === request) pending.current.delete(key); }
     }, [path, activeSite, user?.id]);
     useEffect(() => {
         setData(null);
@@ -42,7 +46,7 @@ function useLive(path: string) {
         window.addEventListener('focus', poll);
         return () => { version.current++; clearInterval(timer); window.removeEventListener('focus', poll); };
     }, [refresh]);
-    return { data, error, refresh };
+    return { data: dataKey.current === currentKey ? data : null, error, refresh };
 }
 function Status({ error, loading, retry }: {
     error: string;
@@ -68,12 +72,25 @@ export function LiveMetrics() {
     <Status error={error} loading={!data} retry={refresh}/>{data && <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{metrics.map(([label, key]) => <article key={key} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-sm text-slate-500">{label}</p>
             <strong className="mt-2 block text-3xl font-semibold tracking-tight text-slate-900">{data[key] ?? '—'}</strong>
-            </article>)}</div>}</section>;
+            </article>)}</div>}
+    <p className="text-xs text-slate-500">Active and unactioned totals cover enquiries received in the selected period. Unactioned means no recorded contact by call, email or SMS.</p>
+    </section>;
 }
 export function PulseView({ onSelectLead }: {
     onSelectLead: (lead: Lead) => void;
 }) {
-    const { data, error, refresh } = useLive('/pulse');
+    const { activeSite, user } = useAuth();
+    const scope = `${user?.id}:${activeSite}`;
+    const [pages, setPages] = useState({ scope, page: 1, followupPage: 1, limit: 10, followupLimit: 10 });
+    const current = pages.scope === scope ? pages : { ...pages, scope, page: 1, followupPage: 1 };
+    const updatePage = (patch: Partial<typeof pages>) => setPages({ ...current, ...patch });
+    const { data, error, refresh } = useLive(`/pulse?${new URLSearchParams({ page: String(current.page), limit: String(current.limit), followupPage: String(current.followupPage), followupLimit: String(current.followupLimit) })}`);
+    useEffect(() => {
+      if (!data?.pagination || !data?.followupPagination) return;
+      if (current.page !== data.pagination.page || current.followupPage !== data.followupPagination.page) {
+        setPages({ ...current, page: data.pagination.page, followupPage: data.followupPagination.page });
+      }
+    }, [data, scope, current.page, current.followupPage, current.limit, current.followupLimit]);
     const staff = useLive('/staff');
     const [actionError, setActionError] = useState('');
     const open = async (id: string) => {
@@ -100,7 +117,12 @@ export function PulseView({ onSelectLead }: {
     <Status error={error || staff.error || actionError} loading={!data} retry={refresh}/>
     {data && <>
         <p className="text-sm text-slate-500">Follow-up turns amber at {data.config.followupAmberHours}h and red at {data.config.followupRedHours}h. Conversion thresholds: {data.config.conversionAmber}% / {data.config.conversionGreen}%.</p>
-        <div className="overflow-x-auto rounded-xl border bg-white">
+        <section aria-label="Salesperson PULSE" className="overflow-hidden rounded-xl border bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
+          <h2 className="font-semibold">Salespeople</h2>
+          <label className="text-sm text-slate-600">Salespeople per page <select aria-label="Salespeople per page" value={current.limit} onChange={event => updatePage({ limit: Number(event.target.value), page: 1 })} className="ml-2 rounded-lg border px-2 py-1">{[10,20,50].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
+        </div>
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
         <thead className="border-b bg-slate-50 text-xs uppercase text-slate-500">
         <tr>{['Salesperson', 'Signal', 'Active leads', 'Follow-up due', 'Sales', 'Conversion', 'Presence'].map(label => <th key={label} className="whitespace-nowrap p-4">{label}</th>)}</tr>
@@ -121,12 +143,19 @@ export function PulseView({ onSelectLead }: {
                 </tr>;
             })}</tbody>
         </table>{!data.consultants.length && <p className="p-6 text-sm text-slate-500">No assigned leads at this site yet.</p>}</div>
-        <section className="rounded-xl border bg-white p-5">
-        <h2 className="mb-3 font-semibold">Customers needing follow-up</h2>
-        <div className="grid gap-2 sm:grid-cols-2">{data.consultants.flatMap((person: any) => person.flaggedLeads.map((lead: any) => <button key={lead.id} onClick={() => void open(lead.id)} className="rounded-lg border p-3 text-left text-sm hover:bg-slate-50">
+        {data.pagination && <Pagination currentPage={data.pagination.page} totalPages={data.pagination.pages} totalItems={data.pagination.total} pageSize={data.pagination.limit} onPageChange={page => updatePage({ page })} itemName="salespeople"/>}
+        </section>
+        <section aria-label="Customers needing follow-up" className="overflow-hidden rounded-xl border bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <h2 className="font-semibold">Customers needing follow-up</h2>
+          <label className="text-sm text-slate-600">Follow-ups per page <select aria-label="Follow-ups per page" value={current.followupLimit} onChange={event => updatePage({ followupLimit: Number(event.target.value), followupPage: 1 })} className="ml-2 rounded-lg border px-2 py-1">{[10,20,50].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
+        </div>
+        <div className="grid gap-2 px-5 pb-5 sm:grid-cols-2">{(data.followups || []).map((lead: any) => <button key={lead.id} onClick={() => void open(lead.id)} className="rounded-lg border p-3 text-left text-sm hover:bg-slate-50">
             <strong>{lead.name}</strong>
-            <p className="mt-1 text-slate-500">{person.name} · {lead.age} · {lead.reason}</p>
-            </button>))}</div>
+            <p className="mt-1 text-slate-500">{lead.consultant} · {lead.age} · {lead.reason}</p>
+            </button>)}</div>
+        {!data.followups?.length && <p className="px-5 pb-5 text-sm text-slate-500">No customers need follow-up at this site.</p>}
+        {data.followupPagination && <Pagination currentPage={data.followupPagination.page} totalPages={data.followupPagination.pages} totalItems={data.followupPagination.total} pageSize={data.followupPagination.limit} onPageChange={followupPage => updatePage({ followupPage })} itemName="follow-ups"/>}
         </section>
         </>}
   </div>;
