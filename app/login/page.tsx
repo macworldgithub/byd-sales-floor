@@ -74,8 +74,8 @@ export default function LoginPage() {
         <div className="login-brand">
           <div className="login-logo">
             <img
-              src="/images/good-showroom-mark.png"
-              alt="Good Showroom"
+              src="/images/byd-mark.png"
+              alt="BYD Harmony"
               className="w-10 h-10 object-contain"
             />
           </div>
