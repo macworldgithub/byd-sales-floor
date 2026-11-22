@@ -39,8 +39,11 @@ export function Header({
 }: HeaderProps) {
   const { user, logout, activeSite, setActiveSite } = useAuth();
   const { sites } = useCrm();
-  const siteOptions = user?.allowed_sites && !user.all_sites ? user.allowed_sites : sites;
-  const canSelectAll = isFloorAdmin(user?.role) && (user?.all_sites || !user?.allowed_sites);
+  const isNunawadingSuper = user?.email?.trim().toLowerCase() === 'nunawading@byd.com';
+  const siteOptions = isNunawadingSuper
+    ? ['BYD Nunawading']
+    : (user?.locked_site ? [user.locked_site] : (user?.allowed_sites && !user.all_sites ? user.allowed_sites : sites));
+  const canSelectAll = !isNunawadingSuper && isFloorAdmin(user?.role) && !user?.locked_site && (user?.all_sites || !user?.allowed_sites);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<{
     leads: Lead[];

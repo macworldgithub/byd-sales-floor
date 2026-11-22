@@ -43,12 +43,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser]       = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [savedSite, setSavedSite] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('byd_floor_site') || '' : '');
-  const assignedSites = user?.allowed_sites && !user.all_sites ? user.allowed_sites : null;
-  const activeSite = isFloorAdmin(user?.role) ? (savedSite || (user?.all_sites ? 'All Sites' : user?.site || 'All Sites')) : assignedSites ? (assignedSites.includes(savedSite) ? savedSite : user?.site || assignedSites[0]) : user?.locked_site || user?.site || '';
+  const isNunawadingSuper = user?.email?.trim().toLowerCase() === 'nunawading@byd.com';
+  const assignedSites = isNunawadingSuper
+    ? ['BYD Nunawading']
+    : (user?.locked_site ? [user.locked_site] : (user?.allowed_sites && !user.all_sites ? user.allowed_sites : null));
+  const activeSite = isNunawadingSuper
+    ? 'BYD Nunawading'
+    : (user?.locked_site
+    ? user.locked_site
+    : isFloorAdmin(user?.role) && (user?.all_sites || (!user?.allowed_sites && !user?.locked_site))
+    ? (savedSite || 'All Sites')
+    : assignedSites
+    ? (assignedSites.includes(savedSite) ? savedSite : user?.site || assignedSites[0])
+    : user?.locked_site || user?.site || '');
   const setActiveSite = useCallback((site: string) => {
+    if (isNunawadingSuper) return;
     if (assignedSites && !assignedSites.includes(site)) return;
     setSavedSite(site); localStorage.setItem('byd_floor_site', site);
-  }, [assignedSites]);
+  }, [assignedSites, isNunawadingSuper]);
 
   // On mount, try to rehydrate session from stored token
   useEffect(() => {
