@@ -2,7 +2,7 @@ export const MANAGEMENT = ['super_admin', 'admin', 'site_admin', 'manager', 'sal
 export const isManager = (role?: string) => MANAGEMENT.includes(role || '');
 export const floorNavigation = [
     { id: 'today', label: 'Today', group: 'Floor Operations' },
-    { id: 'leads', label: 'Leads Centre (CRM)', group: 'Floor Operations' },
+    { id: 'leads', label: 'Customer 360', group: 'Floor Operations' },
     { id: 'inventory', label: 'Live Inventory', group: 'Floor Operations' },
     { id: 'calendar', label: 'Showroom Floor', group: 'Floor Operations' },
     { id: 'customers', label: 'Customers & Merge', group: 'Floor Operations' },
